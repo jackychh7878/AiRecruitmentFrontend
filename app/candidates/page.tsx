@@ -19,9 +19,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { api, type CandidateProfile, type PaginationInfo } from "@/lib/api"
-import { Plus, Search, MoreVertical, Eye, Edit, UserX, Trash2, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { testBackendConnection, type ConnectionTestResult } from "@/lib/connection-test"
+import { Plus, Search, MoreVertical, Eye, Edit, UserX, Trash2, ChevronLeft, ChevronRight, Loader2, AlertTriangle, CheckCircle, Wifi, UserCircle } from "lucide-react"
 import Link from "next/link"
 
 export default function CandidatesPage() {
@@ -36,7 +38,28 @@ export default function CandidatesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [deleteCandidate, setDeleteCandidate] = useState<CandidateProfile | null>(null)
   const [deactivateCandidate, setDeactivateCandidate] = useState<CandidateProfile | null>(null)
+  const [connectionTest, setConnectionTest] = useState<ConnectionTestResult | null>(null)
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
   const { toast } = useToast()
+
+  // Test connection on component mount
+  useEffect(() => {
+    const checkConnection = async () => {
+      const result = await testBackendConnection()
+      setConnectionTest(result)
+      
+      if (!result.isConnected) {
+        setShowDebugPanel(true)
+        toast({
+          title: "Connection Error",
+          description: result.error || "Cannot connect to backend",
+          variant: "destructive",
+        })
+      }
+    }
+    
+    checkConnection()
+  }, [toast])
 
   const loadCandidates = async (page = 1, perPage = 20) => {
     try {
@@ -46,16 +69,57 @@ export default function CandidatesPage() {
         per_page: perPage,
         include_relationships: true,
       })
-      setCandidates(response.candidates)
-      setPagination(response.pagination)
+      
+      // Ensure we have valid data before setting state
+      if (response && response.candidates && response.pagination) {
+        setCandidates(response.candidates)
+        setPagination(response.pagination)
+      } else {
+        // Fallback to empty state if API response is malformed
+        console.warn('Invalid API response structure:', response)
+        setCandidates([])
+        setPagination({
+          page: page,
+          per_page: perPage,
+          total: 0,
+          pages: 0,
+        })
+      }
+      
+      // Hide debug panel on successful load
+      if (showDebugPanel) {
+        setShowDebugPanel(false)
+      }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to load candidates",
+        description: error instanceof Error ? error.message : "Failed to load candidates",
         variant: "destructive",
       })
+      
+      // Show debug panel on error
+      setShowDebugPanel(true)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const retryConnection = async () => {
+    const result = await testBackendConnection()
+    setConnectionTest(result)
+    
+    if (result.isConnected) {
+      toast({
+        title: "Connection Restored",
+        description: `Connected to ${result.endpoint}`,
+      })
+      loadCandidates()
+    } else {
+      toast({
+        title: "Connection Failed",
+        description: result.error || "Still cannot connect to backend",
+        variant: "destructive",
+      })
     }
   }
 
@@ -64,12 +128,18 @@ export default function CandidatesPage() {
   }, [])
 
   const handlePageChange = (newPage: number) => {
-    loadCandidates(newPage, pagination.per_page)
+    if (pagination && newPage >= 1 && newPage <= pagination.pages && !loading) {
+      setPagination(prev => ({ ...prev, page: newPage }))
+      loadCandidates(newPage, pagination.per_page)
+    }
   }
 
   const handlePerPageChange = (newPerPage: string) => {
     const perPage = Number.parseInt(newPerPage)
-    loadCandidates(1, perPage)
+    if (perPage && !loading) {
+      setPagination(prev => prev ? { ...prev, per_page: perPage, page: 1 } : { page: 1, per_page: perPage, total: 0, pages: 0 })
+      loadCandidates(1, perPage)
+    }
   }
 
   const handleDeactivate = async (candidate: CandidateProfile) => {
@@ -79,7 +149,7 @@ export default function CandidatesPage() {
         title: "Success",
         description: `${candidate.first_name} ${candidate.last_name} has been deactivated`,
       })
-      loadCandidates(pagination.page, pagination.per_page)
+      loadCandidates(pagination?.page || 1, pagination?.per_page || 20)
     } catch (error) {
       toast({
         title: "Error",
@@ -97,7 +167,7 @@ export default function CandidatesPage() {
         title: "Success",
         description: `${candidate.first_name} ${candidate.last_name} has been deleted`,
       })
-      loadCandidates(pagination.page, pagination.per_page)
+      loadCandidates(pagination?.page || 1, pagination?.per_page || 20)
     } catch (error) {
       toast({
         title: "Error",
@@ -110,9 +180,9 @@ export default function CandidatesPage() {
 
   const filteredCandidates = candidates.filter(
     (candidate) =>
-      `${candidate.first_name} ${candidate.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      candidate.classification_of_interest?.toLowerCase().includes(searchQuery.toLowerCase()),
+      `${candidate.first_name || ''} ${candidate.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (candidate.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (candidate.classification_of_interest || '').toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   return (
@@ -129,6 +199,29 @@ export default function CandidatesPage() {
         </Link>
       </PageHeader>
 
+      {/* Debug Panel */}
+      {showDebugPanel && (
+        <Alert className="mb-6 border-red-200 bg-red-50">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            <strong>Connection Issue:</strong> {connectionTest?.error || "Cannot connect to backend"}
+            <br />
+            <span className="text-sm">Endpoint: {connectionTest?.endpoint}</span>
+            <br />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={retryConnection}
+              className="mt-2"
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wifi className="w-4 h-4 mr-2" />}
+              Retry Connection
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
@@ -138,9 +231,14 @@ export default function CandidatesPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
+            disabled={loading}
           />
         </div>
-        <Select value={pagination.per_page.toString()} onValueChange={handlePerPageChange}>
+        <Select 
+          value={pagination?.per_page?.toString() || "20"} 
+          onValueChange={handlePerPageChange}
+          disabled={loading}
+        >
           <SelectTrigger className="w-32">
             <SelectValue />
           </SelectTrigger>
@@ -153,6 +251,25 @@ export default function CandidatesPage() {
         </Select>
       </div>
 
+      {/* Debug Info */}
+      {process.env.NEXT_PUBLIC_DEBUG === 'true' && !loading && (
+        <Alert className="mb-6 border-blue-200 bg-blue-50">
+          <AlertDescription className="text-blue-800">
+            <strong>Debug Info:</strong>
+            <br />
+            <span className="text-sm">
+              Total Candidates: {candidates.length} | 
+              Filtered: {filteredCandidates.length} | 
+              API Total: {pagination?.total || 0}
+            </span>
+            <br />
+            <span className="text-xs">
+              First candidate: {candidates[0] ? `${candidates[0].first_name} ${candidates[0].last_name}` : 'None'}
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Candidates Grid */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
@@ -160,23 +277,47 @@ export default function CandidatesPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-            {filteredCandidates.map((candidate) => (
+          {filteredCandidates.length === 0 ? (
+            <Card className="py-12">
+              <CardContent className="text-center">
+                <div className="text-gray-500 mb-4">
+                                     <UserCircle className="w-12 h-12 mx-auto mb-2" />
+                  <h3 className="text-lg font-medium">No candidates found</h3>
+                  <p className="text-sm">
+                    {candidates.length === 0 
+                      ? "No candidates are available. Add your first candidate to get started."
+                      : "No candidates match your search criteria. Try adjusting your search query."
+                    }
+                  </p>
+                </div>
+                {candidates.length === 0 && (
+                  <Link href="/candidates/create">
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add First Candidate
+                    </Button>
+                  </Link>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+              {filteredCandidates.map((candidate) => (
               <Card key={candidate.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
                       <Avatar>
                         <AvatarFallback>
-                          {candidate.first_name[0]}
-                          {candidate.last_name[0]}
+                          {candidate.first_name?.[0] || 'U'}
+                          {candidate.last_name?.[0] || 'U'}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <CardTitle className="text-lg">
-                          {candidate.first_name} {candidate.last_name}
+                          {candidate.first_name || 'Unknown'} {candidate.last_name || 'User'}
                         </CardTitle>
-                        <CardDescription>{candidate.email}</CardDescription>
+                        <CardDescription>{candidate.email || 'No email provided'}</CardDescription>
                       </div>
                     </div>
                     <DropdownMenu>
@@ -232,11 +373,12 @@ export default function CandidatesPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* Pagination */}
-          {pagination.pages > 1 && (
+          {pagination && pagination.pages > 1 && (
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-500">
                 Showing {(pagination.page - 1) * pagination.per_page + 1} to{" "}
@@ -312,7 +454,7 @@ export default function CandidatesPage() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  )
+              </AlertDialog>
+      </div>
+    )
 }

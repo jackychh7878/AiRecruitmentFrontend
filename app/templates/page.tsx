@@ -126,20 +126,30 @@ export default function PromptTemplatesPage() {
   const handleBulkRegeneration = async () => {
     try {
       setBulkRegenLoading(true)
-      // This would trigger the bulk regeneration API
-      // For now, we'll simulate the process
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      
+      // Start bulk regeneration job
+      const response = await api.startBulkRegeneration(
+        "admin@company.com", // This should come from user context
+        activeTemplate?.id
+      )
 
-      toast({
-        title: "Bulk Regeneration Started",
-        description: "AI summaries are being regenerated for all candidates. This may take several minutes.",
-      })
+      if (response.success) {
+        toast({
+          title: "Bulk Regeneration Started",
+          description: `Job ${response.job_id} started. AI summaries are being regenerated for all candidates.`,
+        })
+
+        // You could implement job monitoring here
+        // monitorBulkRegenerationJob(response.job_id)
+      } else {
+        throw new Error(response.message || "Failed to start bulk regeneration")
+      }
 
       setShowBulkRegenDialog(false)
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to start bulk regeneration",
+        description: error instanceof Error ? error.message : "Failed to start bulk regeneration",
         variant: "destructive",
       })
     } finally {

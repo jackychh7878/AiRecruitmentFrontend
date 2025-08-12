@@ -1,11 +1,15 @@
 // API configuration and utilities
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+const API_TIMEOUT = Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000
 
 export interface ApiResponse<T = any> {
   success?: boolean
   message?: string
   data?: T
   error?: string
+  candidate?: T  // For candidate-specific responses
+  templates?: T[]  // For template responses
+  pagination?: PaginationInfo  // For paginated responses
 }
 
 export interface PaginationInfo {
@@ -83,12 +87,12 @@ export interface Education {
 export interface LicenseCertification {
   id: number
   candidate_id: number
-  name: string
-  issuing_organization: string
+  license_certification_name: string
+  issuing_organisation: string
   issue_date: string
-  expiration_date?: string
-  credential_id?: string
-  credential_url?: string
+  expiry_date?: string
+  is_no_expiry: boolean
+  description?: string
   is_active: boolean
   created_date: string
   last_modified_date: string
@@ -107,11 +111,13 @@ export interface Language {
 export interface Resume {
   id: number
   candidate_id: number
-  filename: string
-  file_path: string
+  file_name: string
   file_size: number
+  content_type: string
   upload_date: string
   is_active: boolean
+  created_date: string
+  last_modified_date: string
 }
 
 export interface PromptTemplate {
@@ -149,13 +155,19 @@ export interface SearchOptions {
 // API client class
 class ApiClient {
   private baseURL: string
+  private timeout: number
 
-  constructor(baseURL: string = API_BASE_URL) {
+  constructor(baseURL: string = API_BASE_URL, timeout: number = API_TIMEOUT) {
     this.baseURL = baseURL
+    this.timeout = timeout
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
+
+    // Create abort controller for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
     const config: RequestInit = {
       headers: {
@@ -163,11 +175,13 @@ class ApiClient {
         Accept: "application/json",
         ...options.headers,
       },
+      signal: controller.signal,
       ...options,
     }
 
     try {
       const response = await fetch(url, config)
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -176,8 +190,29 @@ class ApiClient {
 
       return await response.json()
     } catch (error) {
-      console.error("API request failed:", error)
-      throw error
+      clearTimeout(timeoutId)
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Request timeout')
+        }
+        
+        // Handle common connection errors
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Cannot connect to backend. Please check if the backend is running or switch to production API.')
+        }
+        
+        if (error.message.includes('CORS')) {
+          throw new Error('CORS error: Backend needs to allow requests from this origin.')
+        }
+        
+        if (error.message.includes('ERR_CONNECTION_REFUSED')) {
+          throw new Error('Connection refused: Backend server is not running on the specified port.')
+        }
+        
+        console.error("API request failed:", error)
+        throw error
+      }
+      throw new Error('Unknown error occurred')
     }
   }
 
@@ -193,10 +228,26 @@ class ApiClient {
     if (params?.include_relationships) searchParams.set("include_relationships", "true")
 
     const query = searchParams.toString()
-    return this.request<{
+    
+    // Get the raw API response which has a flat structure
+    const response = await this.request<{
       candidates: CandidateProfile[]
-      pagination: PaginationInfo
+      total: number
+      pages: number
+      current_page: number
+      per_page: number
     }>(`/candidates${query ? `?${query}` : ""}`)
+    
+    // Transform to the expected nested structure
+    return {
+      candidates: response.candidates,
+      pagination: {
+        page: response.current_page,
+        per_page: response.per_page,
+        total: response.total,
+        pages: response.pages,
+      }
+    }
   }
 
   async getCandidate(id: number, includeRelationships = false) {
@@ -233,6 +284,7 @@ class ApiClient {
       total_found: number
       query: string
       confidence_threshold: number
+      query_embedding_dimension?: number
     }>("/candidates/semantic-search", {
       method: "POST",
       body: JSON.stringify({
@@ -273,7 +325,7 @@ class ApiClient {
     }>("/candidates/semantic-search/example-queries")
   }
 
-  // Prompt template methods
+  // Prompt template methods - Fixed endpoints to match API documentation
   async getPromptTemplates(params?: {
     page?: number
     per_page?: number
@@ -329,7 +381,11 @@ class ApiClient {
     return this.request<{
       success: boolean
       parsed_data: Partial<CandidateProfile>
-      confidence_score: number
+      parsing_metadata?: {
+        processing_time: number
+        confidence_score: number
+      }
+      confidence_score: number  // For backward compatibility
     }>("/candidates/parse-resume", {
       method: "POST",
       body: formData,
@@ -337,7 +393,7 @@ class ApiClient {
     })
   }
 
-  async createFromParsedData(data: Partial<CandidateProfile>) {
+  async createFromParsedData(data: { parsed_data: Partial<CandidateProfile>; remarks?: string }) {
     return this.request<ApiResponse<CandidateProfile>>("/candidates/create-from-parsed-data", {
       method: "POST",
       body: JSON.stringify(data),
@@ -345,15 +401,79 @@ class ApiClient {
   }
 
   // Resume upload
-  async uploadResume(candidateId: number, file: File) {
+  async uploadResume(candidateId: number, file: File, remarks?: string) {
     const formData = new FormData()
     formData.append("resume_file", file)
+    if (remarks) formData.append("remarks", remarks)
 
     return this.request<ApiResponse<Resume>>(`/candidates/${candidateId}/resumes`, {
       method: "POST",
       body: formData,
       headers: {}, // Remove Content-Type to let browser set it for FormData
     })
+  }
+
+  // Bulk regeneration methods
+  async startBulkRegeneration(createdBy: string, promptTemplateId?: number) {
+    return this.request<{
+      success: boolean
+      message: string
+      job_id: string
+      warnings?: string[]
+    }>("/candidates/ai-summary/bulk-regenerate", {
+      method: "POST",
+      body: JSON.stringify({
+        created_by: createdBy,
+        prompt_template_id: promptTemplateId,
+      }),
+    })
+  }
+
+  async getBulkRegenerationJob(jobId: string) {
+    return this.request<{
+      job_id: string
+      status: string
+      started_at: string
+      created_by: string
+      prompt_template_id?: number
+      total_profiles: number
+      processed_profiles: number
+      successful_updates: number
+      failed_updates: number
+      current_profile_id?: number
+      estimated_completion?: string
+      errors?: string[]
+      completed_at?: string
+    }>(`/candidates/ai-summary/bulk-regenerate/jobs/${jobId}`)
+  }
+
+  async getAllBulkRegenerationJobs() {
+    return this.request<{
+      jobs: Array<{
+        job_id: string
+        status: string
+        started_at: string
+        total_profiles: number
+        processed_profiles: number
+      }>
+      total_jobs: number
+    }>("/candidates/ai-summary/bulk-regenerate/jobs")
+  }
+
+  async cancelBulkRegenerationJob(jobId: string) {
+    return this.request<ApiResponse>(`/candidates/ai-summary/bulk-regenerate/jobs/${jobId}`, {
+      method: "DELETE",
+    })
+  }
+
+  async getBulkRegenerationStats() {
+    return this.request<{
+      max_concurrent_workers: number
+      rate_limit_delay_seconds: number
+      active_jobs_count: number
+      system_capacity: string
+      estimated_processing_time_per_profile: string
+    }>("/candidates/ai-summary/bulk-regenerate/stats")
   }
 }
 

@@ -193,7 +193,7 @@ export default function CandidateDetailsPage() {
                       <div className="flex items-center space-x-2">
                         <FileText className="w-4 h-4 text-gray-500" />
                         <div>
-                          <div className="text-sm font-medium">{resume.filename}</div>
+                          <div className="text-sm font-medium">{resume.file_name}</div>
                           <div className="text-xs text-gray-500">{Math.round(resume.file_size / 1024)} KB</div>
                         </div>
                       </div>

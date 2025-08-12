@@ -84,8 +84,11 @@ export default function CreateCandidatePage() {
       setLoading(true)
       setStep("creating")
 
-      // Create candidate profile
-      const createResponse = await api.createFromParsedData(formData)
+      // Create candidate profile with parsed data and remarks
+      const createResponse = await api.createFromParsedData({
+        parsed_data: formData,
+        remarks: formData.remarks || "Created from resume parsing"
+      })
 
       if (!createResponse.success || !createResponse.candidate) {
         throw new Error("Failed to create candidate profile")
@@ -95,7 +98,7 @@ export default function CreateCandidatePage() {
 
       // Upload resume file
       if (selectedFile) {
-        await api.uploadResume(candidateId, selectedFile)
+        await api.uploadResume(candidateId, selectedFile, "Initial resume upload")
       }
 
       setStep("finalizing")
