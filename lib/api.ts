@@ -413,6 +413,33 @@ class ApiClient {
     })
   }
 
+  // Resume download
+  async downloadResume(resumeId: number): Promise<Blob> {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+
+    try {
+      const response = await fetch(`${this.baseURL}/resumes/${resumeId}/download`, {
+        method: "GET",
+        headers: {
+          Accept: "application/pdf,application/octet-stream",
+        },
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.statusText}`)
+      }
+
+      return response.blob()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      throw error
+    }
+  }
+
   // Bulk regeneration methods
   async startBulkRegeneration(createdBy: string, promptTemplateId?: number) {
     return this.request<{

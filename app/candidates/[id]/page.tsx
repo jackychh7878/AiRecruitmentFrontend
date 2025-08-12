@@ -59,6 +59,35 @@ export default function CandidateDetailsPage() {
     }
   }, [candidateId, router, toast])
 
+  const handleDownloadResume = async (resumeId: number, fileName: string) => {
+    try {
+      const blob = await api.downloadResume(resumeId)
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      
+      // Cleanup
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      toast({
+        title: "Success",
+        description: "Resume downloaded successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download resume",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-6">
@@ -197,7 +226,11 @@ export default function CandidateDetailsPage() {
                           <div className="text-xs text-gray-500">{Math.round(resume.file_size / 1024)} KB</div>
                         </div>
                       </div>
-                      <Button size="sm" variant="outline">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleDownloadResume(resume.id, resume.file_name)}
+                      >
                         <Download className="w-4 h-4" />
                       </Button>
                     </div>

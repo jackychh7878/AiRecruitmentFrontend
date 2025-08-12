@@ -122,6 +122,35 @@ export default function EditCandidatePage() {
     }
   }
 
+  const handleDownloadResume = async (resumeId: number, fileName: string) => {
+    try {
+      const blob = await api.downloadResume(resumeId)
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      
+      // Cleanup
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      toast({
+        title: "Success",
+        description: "Resume downloaded successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download resume",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Warn user before leaving with unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -533,7 +562,11 @@ export default function EditCandidatePage() {
                           </div>
                         </div>
                       </div>
-                      <Button size="sm" variant="outline">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleDownloadResume(resume.id, resume.file_name)}
+                      >
                         Download
                       </Button>
                     </div>
