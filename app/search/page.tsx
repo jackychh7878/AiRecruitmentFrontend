@@ -40,9 +40,9 @@ export default function SemanticSearchPage() {
   const { toast } = useToast()
 
   const confidenceThresholds = {
-    broad: 0.3,
-    balanced: 0.7,
-    narrow: 0.9,
+    broad: 0.0,
+    balanced: 0.2,
+    narrow: 0.3,
   }
 
   const searchModeDescriptions = {
@@ -260,47 +260,47 @@ export default function SemanticSearchPage() {
       </Card>
 
       {/* Search Statistics */}
-      {searchStats && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center text-lg">
-              <BarChart3 className="w-5 h-5 mr-2" />
-              Search Statistics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{searchStats.total_active_candidates}</div>
-                <div className="text-sm text-gray-600">Total Candidates</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{searchStats.candidates_with_embeddings}</div>
-                <div className="text-sm text-gray-600">AI-Enabled</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  {Math.round(searchStats.embedding_coverage_percentage)}%
-                </div>
-                <div className="text-sm text-gray-600">Coverage</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{searchStats.default_confidence_threshold}</div>
-                <div className="text-sm text-gray-600">Default Threshold</div>
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>AI Coverage Progress</span>
-                <span>
-                  {searchStats.candidates_with_embeddings} / {searchStats.total_active_candidates}
-                </span>
-              </div>
-              <Progress value={searchStats.embedding_coverage_percentage} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/*{searchStats && (*/}
+      {/*  <Card className="mb-6">*/}
+      {/*    <CardHeader>*/}
+      {/*      <CardTitle className="flex items-center text-lg">*/}
+      {/*        <BarChart3 className="w-5 h-5 mr-2" />*/}
+      {/*        Search Statistics*/}
+      {/*      </CardTitle>*/}
+      {/*    </CardHeader>*/}
+      {/*    <CardContent>*/}
+      {/*      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">*/}
+      {/*        <div className="text-center">*/}
+      {/*          <div className="text-2xl font-bold text-blue-600">{searchStats.total_active_candidates}</div>*/}
+      {/*          <div className="text-sm text-gray-600">Total Candidates</div>*/}
+      {/*        </div>*/}
+      {/*        <div className="text-center">*/}
+      {/*          <div className="text-2xl font-bold text-green-600">{searchStats.candidates_with_embeddings}</div>*/}
+      {/*          <div className="text-sm text-gray-600">AI-Enabled</div>*/}
+      {/*        </div>*/}
+      {/*        <div className="text-center">*/}
+      {/*          <div className="text-2xl font-bold text-orange-600">*/}
+      {/*            {Math.round(searchStats.embedding_coverage_percentage)}%*/}
+      {/*          </div>*/}
+      {/*          <div className="text-sm text-gray-600">Coverage</div>*/}
+      {/*        </div>*/}
+      {/*        <div className="text-center">*/}
+      {/*          <div className="text-2xl font-bold text-purple-600">{searchStats.default_confidence_threshold}</div>*/}
+      {/*          <div className="text-sm text-gray-600">Default Threshold</div>*/}
+      {/*        </div>*/}
+      {/*      </div>*/}
+      {/*      <div className="mt-4">*/}
+      {/*        <div className="flex justify-between text-sm text-gray-600 mb-1">*/}
+      {/*          <span>AI Coverage Progress</span>*/}
+      {/*          <span>*/}
+      {/*            {searchStats.candidates_with_embeddings} / {searchStats.total_active_candidates}*/}
+      {/*          </span>*/}
+      {/*        </div>*/}
+      {/*        <Progress value={searchStats.embedding_coverage_percentage} className="h-2" />*/}
+      {/*      </div>*/}
+      {/*    </CardContent>*/}
+      {/*  </Card>*/}
+      {/*)}*/}
 
       {/* Search Results */}
       {hasSearched && (
