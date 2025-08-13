@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,14 @@ import {
 } from "@/components/ui/dialog"
 import { useLanguageCodes, useLanguageProficiencyCodes } from "@/hooks/use-lookup-codes"
 import type { CareerHistory, Skills, Education, LicenseCertification, Language } from "@/lib/api"
+
+// Component for required field labels
+const RequiredLabel = ({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) => (
+  <Label htmlFor={htmlFor} className="flex items-center gap-1">
+    {children}
+    <span className="text-red-500">*</span>
+  </Label>
+)
 
 interface CandidateEntityModalProps {
   isOpen: boolean
@@ -34,6 +43,7 @@ export function CandidateEntityModal({
   isNew,
 }: CandidateEntityModalProps) {
   const [formData, setFormData] = useState<any>({})
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
   const { codes: languageCodes } = useLanguageCodes()
   const { codes: proficiencyCodes } = useLanguageProficiencyCodes()
 
@@ -47,15 +57,76 @@ export function CandidateEntityModal({
 
   useEffect(() => {
     if (item) {
-      setFormData(item)
+      // Create a deep copy to avoid mutating the original object
+      setFormData({ ...item })
     }
+    // Clear validation errors when modal opens with new item
+    setValidationErrors([])
   }, [item])
+
+  useEffect(() => {
+    // Clear validation errors when modal is closed
+    if (!isOpen) {
+      setValidationErrors([])
+    }
+  }, [isOpen])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }))
+    // Clear validation errors when user starts typing
+    if (validationErrors.length > 0) {
+      setValidationErrors([])
+    }
+  }
+
+  const validateForm = (): string[] => {
+    const errors: string[] = []
+    
+    if (!type) return errors
+
+    switch (type) {
+      case 'career':
+        if (!formData.job_title?.trim()) errors.push("Job title is required")
+        if (!formData.company_name?.trim()) errors.push("Company name is required")
+        if (!formData.start_date?.trim()) errors.push("Start date is required")
+        if (!formData.description?.trim()) errors.push("Description is required")
+        break
+        
+      case 'skill':
+        if (!formData.skills?.trim()) errors.push("Skill name is required")
+        break
+        
+      case 'education':
+        if (!formData.school?.trim()) errors.push("School/Institution is required")
+        if (!formData.degree?.trim()) errors.push("Degree is required")
+        if (!formData.field_of_study?.trim()) errors.push("Field of Study is required")
+        if (!formData.start_date?.trim()) errors.push("Start date is required")
+        break
+        
+      case 'certification':
+        if (!formData.license_certification_name?.trim()) errors.push("Certification name is required")
+        if (!formData.issuing_organisation?.trim()) errors.push("Issuing Organization is required")
+        if (!formData.issue_date?.trim()) errors.push("Issue date is required")
+        break
+        
+      case 'language':
+        if (!formData.language?.trim()) errors.push("Language is required")
+        if (!formData.proficiency_level?.trim()) errors.push("Proficiency level is required")
+        break
+    }
+    
+    return errors
   }
 
   const handleSave = () => {
+    const errors = validateForm()
+    
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+    
+    setValidationErrors([])
     onSave(formData, isNew)
   }
 
@@ -85,7 +156,7 @@ export function CandidateEntityModal({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="job_title">Job Title *</Label>
+                <RequiredLabel htmlFor="job_title">Job Title</RequiredLabel>
                 <Input
                   id="job_title"
                   value={formData.job_title || ""}
@@ -94,7 +165,7 @@ export function CandidateEntityModal({
                 />
               </div>
               <div>
-                <Label htmlFor="company_name">Company Name *</Label>
+                <RequiredLabel htmlFor="company_name">Company Name</RequiredLabel>
                 <Input
                   id="company_name"
                   value={formData.company_name || ""}
@@ -105,12 +176,13 @@ export function CandidateEntityModal({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="start_date">Start Date</Label>
+                <RequiredLabel htmlFor="start_date">Start Date</RequiredLabel>
                 <Input
                   id="start_date"
                   type="date"
                   value={formData.start_date || ""}
                   onChange={(e) => handleInputChange("start_date", e.target.value)}
+                  required
                 />
               </div>
               <div>
@@ -125,13 +197,14 @@ export function CandidateEntityModal({
               </div>
             </div>
             <div>
-              <Label htmlFor="description">Description</Label>
+              <RequiredLabel htmlFor="description">Description</RequiredLabel>
               <Textarea
                 id="description"
                 value={formData.description || ""}
                 onChange={(e) => handleInputChange("description", e.target.value)}
                 rows={3}
                 placeholder="Describe your role and achievements..."
+                required
               />
             </div>
           </div>
@@ -141,7 +214,7 @@ export function CandidateEntityModal({
         return (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="skills">Skill Name *</Label>
+              <RequiredLabel htmlFor="skills">Skill Name</RequiredLabel>
               <Input
                 id="skills"
                 value={formData.skills || ""}
@@ -157,7 +230,7 @@ export function CandidateEntityModal({
         return (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="school">School/Institution *</Label>
+              <RequiredLabel htmlFor="school">School/Institution</RequiredLabel>
               <Input
                 id="school"
                 value={formData.school || ""}
@@ -167,7 +240,7 @@ export function CandidateEntityModal({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="degree">Degree *</Label>
+                <RequiredLabel htmlFor="degree">Degree</RequiredLabel>
                 <Input
                   id="degree"
                   value={formData.degree || ""}
@@ -177,23 +250,25 @@ export function CandidateEntityModal({
                 />
               </div>
               <div>
-                <Label htmlFor="field_of_study">Field of Study</Label>
+                <RequiredLabel htmlFor="field_of_study">Field of Study</RequiredLabel>
                 <Input
                   id="field_of_study"
                   value={formData.field_of_study || ""}
                   onChange={(e) => handleInputChange("field_of_study", e.target.value)}
                   placeholder="e.g., Computer Science"
+                  required
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="start_date">Start Date</Label>
+                <RequiredLabel htmlFor="start_date">Start Date</RequiredLabel>
                 <Input
                   id="start_date"
                   type="date"
                   value={formData.start_date || ""}
                   onChange={(e) => handleInputChange("start_date", e.target.value)}
+                  required
                 />
               </div>
               <div>
@@ -232,7 +307,7 @@ export function CandidateEntityModal({
         return (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="license_certification_name">Certification/License Name *</Label>
+              <RequiredLabel htmlFor="license_certification_name">Certification/License Name</RequiredLabel>
               <Input
                 id="license_certification_name"
                 value={formData.license_certification_name || ""}
@@ -241,21 +316,23 @@ export function CandidateEntityModal({
               />
             </div>
             <div>
-              <Label htmlFor="issuing_organisation">Issuing Organization</Label>
+              <RequiredLabel htmlFor="issuing_organisation">Issuing Organization</RequiredLabel>
               <Input
                 id="issuing_organisation"
                 value={formData.issuing_organisation || ""}
                 onChange={(e) => handleInputChange("issuing_organisation", e.target.value)}
+                required
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="issue_date">Issue Date</Label>
+                <RequiredLabel htmlFor="issue_date">Issue Date</RequiredLabel>
                 <Input
                   id="issue_date"
                   type="date"
                   value={formData.issue_date || ""}
                   onChange={(e) => handleInputChange("issue_date", e.target.value)}
+                  required
                 />
               </div>
               <div>
@@ -299,7 +376,7 @@ export function CandidateEntityModal({
         return (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="language">Language *</Label>
+              <RequiredLabel htmlFor="language">Language</RequiredLabel>
               <Select
                 value={formData.language || ""}
                 onValueChange={(value) => handleInputChange("language", value)}
@@ -317,7 +394,7 @@ export function CandidateEntityModal({
               </Select>
             </div>
             <div>
-              <Label htmlFor="proficiency_level">Proficiency Level *</Label>
+              <RequiredLabel htmlFor="proficiency_level">Proficiency Level</RequiredLabel>
               <Select
                 value={formData.proficiency_level || ""}
                 onValueChange={(value) => handleInputChange("proficiency_level", value)}
@@ -351,6 +428,21 @@ export function CandidateEntityModal({
             {isNew ? "Add new information" : "Update existing information"}
           </DialogDescription>
         </DialogHeader>
+        
+        {/* Validation Errors */}
+        {validationErrors.length > 0 && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              <div className="font-medium mb-2">Please fix the following errors:</div>
+              <ul className="list-disc list-inside space-y-1">
+                {validationErrors.map((error, index) => (
+                  <li key={index} className="text-sm">{error}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {renderForm()}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

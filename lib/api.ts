@@ -601,10 +601,11 @@ class ApiClient {
   // Resume upload
   async uploadResume(candidateId: number, file: File, remarks?: string) {
     const formData = new FormData()
-    formData.append("resume_file", file)
+    formData.append("pdf_file", file) // Backend expects 'pdf_file'
+    formData.append("candidate_id", candidateId.toString()) // Backend expects 'candidate_id' as form field
     if (remarks) formData.append("remarks", remarks)
 
-    return this.request<ApiResponse<Resume>>(`/candidates/${candidateId}/resumes`, {
+    return this.request<ApiResponse<Resume>>(`/resumes/upload`, {
       method: "POST",
       body: formData,
       headers: {}, // Remove Content-Type to let browser set it for FormData
