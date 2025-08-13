@@ -168,6 +168,12 @@ export default function CandidateDetailsPage() {
                   <span className="text-sm">Available in {candidate.availability_weeks} weeks</span>
                 </div>
               )}
+              {candidate.citizenship && (
+                <div className="flex items-center space-x-2">
+                  <Briefcase className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm">{candidate.citizenship}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
-import { api, type CandidateProfile } from "@/lib/api"
+import { api, type CandidateProfile, CITIZENSHIP_OPTIONS } from "@/lib/api"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 
 type CreationStep = "upload" | "parsing" | "review" | "creating" | "finalizing" | "complete"
@@ -27,6 +28,11 @@ export default function CreateCandidatePage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+
+  // Helper to set step (keeping for consistency)
+  const setStepWithDebug = (newStep: CreationStep) => {
+    setStep(newStep)
+  }
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -46,7 +52,7 @@ export default function CreateCandidatePage() {
 
     try {
       setLoading(true)
-      setStep("parsing")
+      setStepWithDebug("parsing")
 
       const response = await api.parseResume(selectedFile)
 
@@ -54,7 +60,7 @@ export default function CreateCandidatePage() {
         setParsedData(response.parsed_data)
         setConfidenceScore(response.confidence_score)
         setFormData(response.parsed_data)
-        setStep("review")
+        setStepWithDebug("review")
 
         toast({
           title: "Resume parsed successfully",
@@ -69,7 +75,7 @@ export default function CreateCandidatePage() {
         description: "Failed to parse resume. Please try again or enter data manually.",
         variant: "destructive",
       })
-      setStep("upload")
+      setStepWithDebug("upload")
     } finally {
       setLoading(false)
     }
@@ -326,6 +332,25 @@ export default function CreateCandidatePage() {
                     value={formData.sub_classification_of_interest || ""}
                     onChange={(e) => handleFormChange("sub_classification_of_interest", e.target.value)}
                   />
+                </div>
+                <div>
+                  <Label htmlFor="citizenship">Citizenship / Work Status</Label>
+                  <Select
+                    value={formData.citizenship || "not-specified"}
+                    onValueChange={(value) => handleFormChange("citizenship", value === "not-specified" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select citizenship status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="not-specified">-- Not specified --</SelectItem>
+                      {CITIZENSHIP_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="availability_weeks">Availability (weeks)</Label>

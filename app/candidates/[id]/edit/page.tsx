@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
-import { api, type CandidateProfile } from "@/lib/api"
+import { api, type CandidateProfile, CITIZENSHIP_OPTIONS } from "@/lib/api"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
   Save, 
   Loader2, 
@@ -335,6 +336,25 @@ export default function EditCandidatePage() {
                     value={formData.sub_classification_of_interest || ""}
                     onChange={(e) => handleInputChange("sub_classification_of_interest", e.target.value)}
                   />
+                </div>
+                <div>
+                  <Label htmlFor="citizenship">Citizenship / Work Status</Label>
+                  <Select
+                    value={formData.citizenship || "not-specified"}
+                    onValueChange={(value) => handleInputChange("citizenship", value === "not-specified" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select citizenship status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="not-specified">-- Not specified --</SelectItem>
+                      {CITIZENSHIP_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="availability_weeks">Availability (weeks)</Label>

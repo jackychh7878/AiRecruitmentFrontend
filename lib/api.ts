@@ -2,6 +2,17 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 const API_TIMEOUT = Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000
 
+// Citizenship options based on Hong Kong SARS categories
+export const CITIZENSHIP_OPTIONS = [
+  "Hong Kong SARS Permanent Resident",
+  "Hong Kong SARS Citizen",
+  "Hong Kong SARS temporary visa with restrictions on industry (e.g. TeachTAS)",
+  "Hong Kong SARS temporary visa (e.g. QMAS, TTPS, IANG)",
+  "Require sponsorship to work for a new employer in Hong Kong SARS"
+] as const
+
+export type CitizenshipType = typeof CITIZENSHIP_OPTIONS[number]
+
 export interface ApiResponse<T = any> {
   success?: boolean
   message?: string
@@ -33,6 +44,7 @@ export interface CandidateProfile {
   salary_expectation?: number
   classification_of_interest?: string
   sub_classification_of_interest?: string
+  citizenship?: string
   is_active: boolean
   remarks?: string
   ai_short_summary?: string
@@ -221,11 +233,13 @@ class ApiClient {
     page?: number
     per_page?: number
     include_relationships?: boolean
+    citizenship?: string
   }) {
     const searchParams = new URLSearchParams()
     if (params?.page) searchParams.set("page", params.page.toString())
     if (params?.per_page) searchParams.set("per_page", params.per_page.toString())
     if (params?.include_relationships) searchParams.set("include_relationships", "true")
+    if (params?.citizenship) searchParams.set("citizenship", params.citizenship)
 
     const query = searchParams.toString()
     
@@ -378,19 +392,47 @@ class ApiClient {
     const formData = new FormData()
     formData.append("resume_file", file)
 
-    return this.request<{
+    const response = await this.request<{
       success: boolean
-      parsed_data: Partial<CandidateProfile>
-      parsing_metadata?: {
-        processing_time: number
-        confidence_score: number
+      message: string
+      candidate_data: Partial<CandidateProfile>
+      parsing_stats: {
+        file_size_bytes: number
+        file_name: string
+        entities_extracted: Record<string, number>
+        contact_info_found: Record<string, boolean>
+        name_extracted: Record<string, boolean>
+        completeness_score: number
       }
-      confidence_score: number  // For backward compatibility
     }>("/candidates/parse-resume", {
       method: "POST",
       body: formData,
       headers: {}, // Remove Content-Type to let browser set it for FormData
     })
+
+    // Transform the response to match frontend expectations
+    const transformedResponse = {
+      success: response.success,
+      message: response.message,
+      parsed_data: {
+        ...response.candidate_data,
+        // Fix license certification field names
+        licenses_certifications: response.candidate_data.licenses_certifications?.map(cert => ({
+          ...cert,
+          license_certification_name: (cert as any).name || cert.license_certification_name,
+          issuing_organisation: (cert as any).issuing_organization || cert.issuing_organisation,
+          expiry_date: (cert as any).expiration_date || cert.expiry_date,
+          is_no_expiry: !!(cert as any).expiration_date === false || cert.is_no_expiry
+        }))
+      },
+      confidence_score: response.parsing_stats.completeness_score / 100, // Convert percentage to decimal
+      parsing_metadata: {
+        processing_time: 0, // Not provided by API
+        confidence_score: response.parsing_stats.completeness_score / 100
+      }
+    }
+    
+    return transformedResponse
   }
 
   async createFromParsedData(data: { parsed_data: Partial<CandidateProfile>; remarks?: string }) {

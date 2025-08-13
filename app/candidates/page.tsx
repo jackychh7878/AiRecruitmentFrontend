@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
-import { api, type CandidateProfile, type PaginationInfo } from "@/lib/api"
+import { api, type CandidateProfile, type PaginationInfo, CITIZENSHIP_OPTIONS } from "@/lib/api"
 import { testBackendConnection, type ConnectionTestResult } from "@/lib/connection-test"
 import { Plus, Search, MoreVertical, Eye, Edit, UserX, Trash2, ChevronLeft, ChevronRight, Loader2, AlertTriangle, CheckCircle, Wifi, UserCircle } from "lucide-react"
 import Link from "next/link"
@@ -36,6 +36,7 @@ export default function CandidatesPage() {
   })
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [citizenshipFilter, setCitizenshipFilter] = useState<string>("")
   const [deleteCandidate, setDeleteCandidate] = useState<CandidateProfile | null>(null)
   const [deactivateCandidate, setDeactivateCandidate] = useState<CandidateProfile | null>(null)
   const [connectionTest, setConnectionTest] = useState<ConnectionTestResult | null>(null)
@@ -68,6 +69,7 @@ export default function CandidatesPage() {
         page,
         per_page: perPage,
         include_relationships: true,
+        citizenship: citizenshipFilter || undefined,
       })
       
       // Ensure we have valid data before setting state
@@ -125,7 +127,7 @@ export default function CandidatesPage() {
 
   useEffect(() => {
     loadCandidates()
-  }, [])
+  }, [citizenshipFilter])
 
   const handlePageChange = (newPage: number) => {
     if (pagination && newPage >= 1 && newPage <= pagination.pages && !loading) {
@@ -182,7 +184,8 @@ export default function CandidatesPage() {
     (candidate) =>
       `${candidate.first_name || ''} ${candidate.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (candidate.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (candidate.classification_of_interest || '').toLowerCase().includes(searchQuery.toLowerCase()),
+      (candidate.classification_of_interest || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (candidate.citizenship || '').toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   return (
@@ -227,13 +230,30 @@ export default function CandidatesPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
-            placeholder="Search candidates by name, email, or classification..."
+            placeholder="Search candidates by name, email, classification, or citizenship..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
             disabled={loading}
           />
         </div>
+        <Select 
+          value={citizenshipFilter || "all"} 
+          onValueChange={(value) => setCitizenshipFilter(value === "all" ? "" : value)}
+          disabled={loading}
+        >
+          <SelectTrigger className="w-64">
+            <SelectValue placeholder="Filter by citizenship" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All citizenship types</SelectItem>
+            {CITIZENSHIP_OPTIONS.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select 
           value={pagination?.per_page?.toString() || "20"} 
           onValueChange={handlePerPageChange}
@@ -358,6 +378,11 @@ export default function CandidatesPage() {
                         <Badge variant="secondary">{candidate.classification_of_interest}</Badge>
                       )}
                       {candidate.location && <Badge variant="outline">{candidate.location}</Badge>}
+                      {candidate.citizenship && (
+                        <Badge variant="default" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+                          {candidate.citizenship}
+                        </Badge>
+                      )}
                     </div>
 
                     {candidate.ai_short_summary && (
