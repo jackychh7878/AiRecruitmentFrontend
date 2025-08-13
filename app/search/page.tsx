@@ -40,15 +40,15 @@ export default function SemanticSearchPage() {
   const { toast } = useToast()
 
   const confidenceThresholds = {
-    broad: 0.3,
-    balanced: 0.7,
-    narrow: 0.9,
+    broad: 0.1,
+    balanced: 0.2,
+    narrow: 0.4,
   }
 
   const searchModeDescriptions = {
-    broad: "Lower threshold (0.3) - More results, less precise matching",
-    balanced: "Medium threshold (0.7) - Balanced results and precision",
-    narrow: "Higher threshold (0.9) - Fewer results, more precise matching",
+    broad: "Lower threshold (0.1) - More results, less precise matching",
+    balanced: "Medium threshold (0.2) - Balanced results and precision",
+    narrow: "Higher threshold (0.4) - Fewer results, more precise matching",
   }
 
   // Load search statistics on component mount
@@ -502,13 +502,13 @@ export default function SemanticSearchPage() {
                 <h4 className="font-medium mb-2">Search Modes</h4>
                 <ul className="text-sm text-gray-600 space-y-1">
                   <li>
-                    • <strong>Broad:</strong> More results, less precise (0.3 threshold)
+                    • <strong>Broad:</strong> More results, less precise (0.1 threshold)
                   </li>
                   <li>
-                    • <strong>Balanced:</strong> Good balance of results and precision (0.7 threshold)
+                    • <strong>Balanced:</strong> Good balance of results and precision (0.2 threshold)
                   </li>
                   <li>
-                    • <strong>Narrow:</strong> Fewer results, more precise (0.9 threshold)
+                    • <strong>Narrow:</strong> Fewer results, more precise (0.4 threshold)
                   </li>
                 </ul>
               </div>

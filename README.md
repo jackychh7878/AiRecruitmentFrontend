@@ -170,9 +170,9 @@ The frontend integrates with the AI Recruitment Backend through a custom API cli
 ## 🔍 Search Functionality
 
 ### Search Modes
-- **Broad** (0.3 threshold): More results, less precise
-- **Balanced** (0.7 threshold): Good balance of results and precision
-- **Narrow** (0.9 threshold): Fewer results, more precise
+- **Broad** (0.1 threshold): More results, less precise
+- **Balanced** (0.2 threshold): Good balance of results and precision
+- **Narrow** (0.4 threshold): Fewer results, more precise
 
 ### Example Queries
 - "Python developer with machine learning experience"
