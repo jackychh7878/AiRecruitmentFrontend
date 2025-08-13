@@ -389,9 +389,10 @@ export default function SemanticSearchPage() {
                       {candidate.classification_of_interest && (
                         <Badge variant="secondary">{candidate.classification_of_interest}</Badge>
                       )}
-                      {candidate.sub_classification_of_interest && (
-                        <Badge variant="outline">{candidate.sub_classification_of_interest}</Badge>
-                      )}
+                                    {/* Temporarily commented out Sub-classification display */}
+              {/* {candidate.sub_classification_of_interest && (
+                <Badge variant="outline">{candidate.sub_classification_of_interest}</Badge>
+              )} */}
                       {candidate.preferred_work_types &&
                         candidate.preferred_work_types.split(",").map((type, index) => (
                           <Badge key={index} variant="outline" className="text-xs">

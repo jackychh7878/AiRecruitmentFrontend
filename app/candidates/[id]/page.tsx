@@ -189,14 +189,15 @@ export default function CandidateDetailsPage() {
                   <Badge className="ml-2">{candidate.classification_of_interest}</Badge>
                 </div>
               )}
-              {candidate.sub_classification_of_interest && (
+              {/* Temporarily commented out Sub-classification display */}
+              {/* {candidate.sub_classification_of_interest && (
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Secondary</Label>
                   <Badge variant="outline" className="ml-2">
                     {candidate.sub_classification_of_interest}
                   </Badge>
                 </div>
-              )}
+              )} */}
               {candidate.preferred_work_types && (
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Work Preferences</Label>

@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { api, type CandidateProfile, convertStringToArray, convertArrayToString } from "@/lib/api"
-import { useCitizenshipCodes, useClassificationCodes, useSubClassificationCodes, usePreferredWorkTypesCodes } from "@/hooks/use-lookup-codes"
+import { useCitizenshipCodes, useClassificationCodes, /* useSubClassificationCodes, */ usePreferredWorkTypesCodes } from "@/hooks/use-lookup-codes"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle } from "lucide-react"
@@ -34,7 +34,7 @@ export default function CreateCandidatePage() {
   // Fetch lookup codes dynamically
   const { codes: citizenshipCodes, loading: citizenshipLoading } = useCitizenshipCodes()
   const { codes: classificationCodes, loading: classificationLoading } = useClassificationCodes()
-  const { codes: subClassificationCodes, loading: subClassificationLoading } = useSubClassificationCodes()
+  // const { codes: subClassificationCodes, loading: subClassificationLoading } = useSubClassificationCodes()
   const { codes: workTypesCodes, loading: workTypesLoading } = usePreferredWorkTypesCodes()
 
   // Convert work types for multi-select
@@ -354,7 +354,8 @@ export default function CreateCandidatePage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                {/* Temporarily commented out Sub-classification field */}
+                {/* <div>
                   <Label htmlFor="sub_classification_of_interest">Sub-classification</Label>
                   <Select
                     value={formData.sub_classification_of_interest || "not-specified"}
@@ -373,7 +374,7 @@ export default function CreateCandidatePage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </div> */}
                 <div>
                   <Label htmlFor="citizenship">Citizenship / Work Status</Label>
                   <Select

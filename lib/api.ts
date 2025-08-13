@@ -460,10 +460,142 @@ class ApiClient {
   }
 
   async createFromParsedData(data: { parsed_data: Partial<CandidateProfile>; remarks?: string }) {
+    // Transform the data to match the expected API format
+    const transformedData = this.transformParsedDataForAPI(data.parsed_data)
+    
+    // Debug logging
+    console.log("Original parsed data:", data.parsed_data)
+    console.log("Transformed data for API:", transformedData)
+    
     return this.request<ApiResponse<CandidateProfile>>("/candidates/create-from-parsed-data", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(transformedData),
     })
+  }
+
+  private transformParsedDataForAPI(parsedData: Partial<CandidateProfile>) {
+    const transformed: any = {
+      // Basic candidate fields
+      first_name: parsedData.first_name || "",
+      last_name: parsedData.last_name || "",
+      email: parsedData.email || "",
+      location: parsedData.location || "",
+      phone_number: parsedData.phone_number || "",
+      personal_summary: parsedData.personal_summary || "",
+      availability_weeks: parsedData.availability_weeks || 0,
+      preferred_work_types: parsedData.preferred_work_types || "",
+      right_to_work: parsedData.right_to_work || false,
+      salary_expectation: parsedData.salary_expectation || 0,
+      classification_of_interest: parsedData.classification_of_interest || "",
+      sub_classification_of_interest: parsedData.sub_classification_of_interest || "",
+      citizenship: parsedData.citizenship || "",
+      is_active: true,
+      
+      // Transform career history
+      career_history: (parsedData.career_history || []).map(job => ({
+        job_title: job.job_title || "",
+        company_name: job.company_name || "",
+        start_date: this.formatDateForAPI(job.start_date),
+        end_date: this.formatDateForAPI(job.end_date),
+        description: job.description || "",
+        is_active: true
+      })),
+      
+      // Transform skills
+      skills: (parsedData.skills || []).map(skill => ({
+        skills: skill.skills || "",
+        career_history_id: skill.career_history_id || null,
+        is_active: true
+      })),
+      
+      // Transform education
+      education: (parsedData.education || []).map(edu => {
+        // Fix cases where degree and school are swapped or malformed
+        let school = edu.school || ""
+        let degree = edu.degree || ""
+        
+        // If school is empty but degree looks like a university name, swap them
+        if (!school && degree && (degree.toLowerCase().includes("university") || degree.toLowerCase().includes("college"))) {
+          school = degree.trim()
+          degree = "Degree" // Default placeholder
+        }
+        
+        return {
+          school: school,
+          degree: degree,
+          field_of_study: edu.field_of_study || "",
+          start_date: this.formatDateForAPI(edu.start_date),
+          end_date: this.formatDateForAPI(edu.end_date),
+          grade: edu.grade || "",
+          description: edu.description || "",
+          is_active: true
+        }
+      }),
+      
+      // Transform licenses and certifications
+      licenses_certifications: (parsedData.licenses_certifications || []).map(cert => ({
+        name: cert.license_certification_name || (cert as any).name || "",
+        issuing_organization: cert.issuing_organisation || (cert as any).issuing_organization || "",
+        issue_date: this.formatDateForAPI(cert.issue_date),
+        expiration_date: cert.is_no_expiry ? null : this.formatDateForAPI(cert.expiry_date || (cert as any).expiration_date),
+        credential_id: (cert as any).credential_id || "",
+        credential_url: (cert as any).credential_url || "",
+        is_active: true
+      })),
+      
+      // Transform languages
+      languages: (parsedData.languages || []).map(lang => ({
+        language: lang.language || "",
+        proficiency_level: this.mapProficiencyLevel(lang.proficiency_level),
+        is_active: true
+      })),
+      
+      // Resumes (usually empty for new candidates)
+      resumes: []
+    }
+    
+    return transformed
+  }
+
+  private formatDateForAPI(dateString?: string | null): string | null {
+    if (!dateString || dateString === "null" || dateString.trim() === "") {
+      return null
+    }
+    
+    // Handle malformed dates like "20" 
+    if (dateString.length < 4) {
+      return null
+    }
+    
+    // Try to parse and format the date
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return null
+      }
+      return date.toISOString().split('T')[0] // Return YYYY-MM-DD format
+    } catch {
+      return null
+    }
+  }
+
+  private mapProficiencyLevel(level?: string): string {
+    if (!level) return "BASIC"
+    
+    const upperLevel = level.toUpperCase()
+    const validLevels = ["BASIC", "INTERMEDIATE", "ADVANCED", "FLUENT", "NATIVE"]
+    
+    // Direct match
+    if (validLevels.includes(upperLevel)) {
+      return upperLevel
+    }
+    
+    // Fuzzy matching
+    if (upperLevel.includes("FLUENT") || upperLevel.includes("NATIVE")) return "FLUENT"
+    if (upperLevel.includes("ADVANCED") || upperLevel.includes("EXPERT")) return "ADVANCED"
+    if (upperLevel.includes("INTERMEDIATE") || upperLevel.includes("MEDIUM")) return "INTERMEDIATE"
+    
+    return "BASIC" // Default fallback
   }
 
   // Resume upload
@@ -572,6 +704,131 @@ class ApiClient {
   // Lookup codes API
   async getLookupCodes(category: string) {
     return this.request<LookupResponse>(`/lookups/${encodeURIComponent(category)}`)
+  }
+
+  // Career History CRUD
+  async getCareerHistory(candidateId: number) {
+    return this.request<CareerHistory[]>(`/candidates/${candidateId}/career-history`)
+  }
+
+  async createCareerHistory(candidateId: number, data: Partial<CareerHistory>) {
+    return this.request<CareerHistory>(`/candidates/${candidateId}/career-history`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateCareerHistory(candidateId: number, careerHistoryId: number, data: Partial<CareerHistory>) {
+    return this.request<CareerHistory>(`/candidates/${candidateId}/career-history/${careerHistoryId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteCareerHistory(candidateId: number, careerHistoryId: number) {
+    return this.request(`/candidates/${candidateId}/career-history/${careerHistoryId}`, {
+      method: "DELETE",
+    })
+  }
+
+  // Skills CRUD
+  async getSkills(candidateId: number) {
+    return this.request<Skills[]>(`/candidates/${candidateId}/skills`)
+  }
+
+  async createSkill(candidateId: number, data: Partial<Skills>) {
+    return this.request<Skills>(`/candidates/${candidateId}/skills`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateSkill(candidateId: number, skillId: number, data: Partial<Skills>) {
+    return this.request<Skills>(`/candidates/${candidateId}/skills/${skillId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteSkill(candidateId: number, skillId: number) {
+    return this.request(`/candidates/${candidateId}/skills/${skillId}`, {
+      method: "DELETE",
+    })
+  }
+
+  // Education CRUD
+  async getEducation(candidateId: number) {
+    return this.request<Education[]>(`/candidates/${candidateId}/education`)
+  }
+
+  async createEducation(candidateId: number, data: Partial<Education>) {
+    return this.request<Education>(`/candidates/${candidateId}/education`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateEducation(candidateId: number, educationId: number, data: Partial<Education>) {
+    return this.request<Education>(`/candidates/${candidateId}/education/${educationId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteEducation(candidateId: number, educationId: number) {
+    return this.request(`/candidates/${candidateId}/education/${educationId}`, {
+      method: "DELETE",
+    })
+  }
+
+  // Licenses & Certifications CRUD
+  async getLicensesCertifications(candidateId: number) {
+    return this.request<LicenseCertification[]>(`/candidates/${candidateId}/licenses-certifications`)
+  }
+
+  async createLicenseCertification(candidateId: number, data: Partial<LicenseCertification>) {
+    return this.request<LicenseCertification>(`/candidates/${candidateId}/licenses-certifications`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateLicenseCertification(candidateId: number, certificationId: number, data: Partial<LicenseCertification>) {
+    return this.request<LicenseCertification>(`/candidates/${candidateId}/licenses-certifications/${certificationId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteLicenseCertification(candidateId: number, certificationId: number) {
+    return this.request(`/candidates/${candidateId}/licenses-certifications/${certificationId}`, {
+      method: "DELETE",
+    })
+  }
+
+  // Languages CRUD
+  async getLanguages(candidateId: number) {
+    return this.request<Language[]>(`/candidates/${candidateId}/languages`)
+  }
+
+  async createLanguage(candidateId: number, data: Partial<Language>) {
+    return this.request<Language>(`/candidates/${candidateId}/languages`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateLanguage(candidateId: number, languageId: number, data: Partial<Language>) {
+    return this.request<Language>(`/candidates/${candidateId}/languages/${languageId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteLanguage(candidateId: number, languageId: number) {
+    return this.request(`/candidates/${candidateId}/languages/${languageId}`, {
+      method: "DELETE",
+    })
   }
 }
 
