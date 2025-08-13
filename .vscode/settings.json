@@ -1,0 +1,17 @@
+{
+  "appService.deploySubpath": ".",
+  "appService.showBuildDuringDeployPrompt": false,
+  "appService.preDeployTask": "npm: build",
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/.next": true
+  },
+  "appService.defaultWebAppToDeploy": "/subscriptions/b30fd111-a4b2-4aaf-99ce-2207e32e3df9/resourceGroups/internal_poc/providers/Microsoft.Web/sites/ai-recruitment-frontend"
+} 

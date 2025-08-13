@@ -6,7 +6,10 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start -p ${PORT:-3000}",
+    "build:production": "NODE_ENV=production next build",
+    "start:production": "NODE_ENV=production next start -p ${PORT:-3000}",
+    "install:legacy": "npm install --legacy-peer-deps"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
