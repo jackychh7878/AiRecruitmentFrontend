@@ -639,6 +639,23 @@ class ApiClient {
     }
   }
 
+  // Resume CRUD operations
+  async getCandidateResumes(candidateId: number) {
+    return this.request<{ candidate_id: number, resumes: Resume[], total: number }>(`/resumes/candidate/${candidateId}`)
+  }
+
+  async deleteResume(resumeId: number) {
+    return this.request(`/resumes/${resumeId}`, {
+      method: "DELETE",
+    })
+  }
+
+  async hardDeleteResume(resumeId: number) {
+    return this.request(`/resumes/${resumeId}/hard-delete`, {
+      method: "DELETE",
+    })
+  }
+
   // Bulk regeneration methods
   async startBulkRegeneration(createdBy: string, promptTemplateId?: number) {
     return this.request<{
@@ -734,50 +751,86 @@ class ApiClient {
 
   // Skills CRUD
   async getSkills(candidateId: number) {
-    return this.request<Skills[]>(`/candidates/${candidateId}/skills`)
+    return this.request<{ candidate_id: number, skills: Skills[], total: number }>(`/skills/candidate/${candidateId}`)
   }
 
   async createSkill(candidateId: number, data: Partial<Skills>) {
-    return this.request<Skills>(`/candidates/${candidateId}/skills`, {
+    // Add candidate_id to the payload as required by backend
+    const payload = {
+      candidate_id: candidateId,
+      career_history_id: data.career_history_id,
+      skills: data.skills,
+    }
+    return this.request<Skills>(`/skills/`, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
   }
 
   async updateSkill(candidateId: number, skillId: number, data: Partial<Skills>) {
-    return this.request<Skills>(`/candidates/${candidateId}/skills/${skillId}`, {
+    // Add candidate_id to the payload
+    const payload = {
+      candidate_id: candidateId,
+      career_history_id: data.career_history_id,
+      skills: data.skills,
+      is_active: data.is_active,
+    }
+    return this.request<Skills>(`/skills/${skillId}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
   }
 
   async deleteSkill(candidateId: number, skillId: number) {
-    return this.request(`/candidates/${candidateId}/skills/${skillId}`, {
+    return this.request(`/skills/${skillId}`, {
       method: "DELETE",
     })
   }
 
   // Education CRUD
   async getEducation(candidateId: number) {
-    return this.request<Education[]>(`/candidates/${candidateId}/education`)
+    return this.request<{ candidate_id: number, education: Education[], total: number }>(`/education/candidate/${candidateId}`)
   }
 
   async createEducation(candidateId: number, data: Partial<Education>) {
-    return this.request<Education>(`/candidates/${candidateId}/education`, {
+    // Add candidate_id to the payload as required by backend
+    const payload = {
+      candidate_id: candidateId,
+      school: data.school,
+      degree: data.degree,
+      field_of_study: data.field_of_study,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      grade: data.grade,
+      description: data.description,
+    }
+    return this.request<Education>(`/education/`, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
   }
 
   async updateEducation(candidateId: number, educationId: number, data: Partial<Education>) {
-    return this.request<Education>(`/candidates/${candidateId}/education/${educationId}`, {
+    // Add candidate_id to the payload
+    const payload = {
+      candidate_id: candidateId,
+      school: data.school,
+      degree: data.degree,
+      field_of_study: data.field_of_study,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      grade: data.grade,
+      description: data.description,
+      is_active: data.is_active,
+    }
+    return this.request<Education>(`/education/${educationId}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
   }
 
   async deleteEducation(candidateId: number, educationId: number) {
-    return this.request(`/candidates/${candidateId}/education/${educationId}`, {
+    return this.request(`/education/${educationId}`, {
       method: "DELETE",
     })
   }
@@ -830,25 +883,38 @@ class ApiClient {
 
   // Languages CRUD
   async getLanguages(candidateId: number) {
-    return this.request<Language[]>(`/candidates/${candidateId}/languages`)
+    return this.request<{ candidate_id: number, languages: Language[], total: number }>(`/languages/candidate/${candidateId}`)
   }
 
   async createLanguage(candidateId: number, data: Partial<Language>) {
-    return this.request<Language>(`/candidates/${candidateId}/languages`, {
+    // Add candidate_id to the payload as required by backend
+    const payload = {
+      candidate_id: candidateId,
+      language: data.language,
+      proficiency_level: data.proficiency_level,
+    }
+    return this.request<Language>(`/languages/`, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
   }
 
   async updateLanguage(candidateId: number, languageId: number, data: Partial<Language>) {
-    return this.request<Language>(`/candidates/${candidateId}/languages/${languageId}`, {
+    // Add candidate_id to the payload
+    const payload = {
+      candidate_id: candidateId,
+      language: data.language,
+      proficiency_level: data.proficiency_level,
+      is_active: data.is_active,
+    }
+    return this.request<Language>(`/languages/${languageId}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
   }
 
   async deleteLanguage(candidateId: number, languageId: number) {
-    return this.request(`/candidates/${candidateId}/languages/${languageId}`, {
+    return this.request(`/languages/${languageId}`, {
       method: "DELETE",
     })
   }

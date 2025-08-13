@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 import { api, type CandidateProfile, type CareerHistory, type Skills, type Education, type LicenseCertification, type Language, convertStringToArray, convertArrayToString } from "@/lib/api"
 import { useCitizenshipCodes, useClassificationCodes, /* useSubClassificationCodes, */ usePreferredWorkTypesCodes } from "@/hooks/use-lookup-codes"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { CandidateEntityModal } from "@/components/candidate-entity-modal"
 import { 
@@ -32,7 +33,9 @@ import {
   Check,
   Plus,
   Edit,
-  Trash2
+  Trash2,
+  MoreVertical,
+  UserX
 } from "lucide-react"
 import Link from "next/link"
 
@@ -42,6 +45,7 @@ export default function EditCandidatePage() {
   const [candidate, setCandidate] = useState<CandidateProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [formData, setFormData] = useState<Partial<CandidateProfile>>({})
   const { toast } = useToast()
@@ -354,6 +358,94 @@ export default function EditCandidatePage() {
       toast({
         title: "Error",
         description: "Failed to download resume",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.includes('pdf')) {
+      toast({
+        title: "Error",
+        description: "Please select a PDF file",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setUploading(true)
+      await api.uploadResume(candidateId, file)
+      
+      toast({
+        title: "Success",
+        description: "Resume uploaded successfully",
+      })
+      
+      // Reload the candidate data to show the new resume
+      const updatedCandidate = await api.getCandidate(candidateId, true)
+      setCandidate(updatedCandidate)
+      
+      // Reset the file input
+      event.target.value = ''
+      
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to upload resume",
+        variant: "destructive",
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleSoftDeleteResume = async (resumeId: number) => {
+    try {
+      await api.deleteResume(resumeId)
+      
+      toast({
+        title: "Success",
+        description: "Resume has been deactivated",
+      })
+      
+      // Reload the candidate data
+      const updatedCandidate = await api.getCandidate(candidateId, true)
+      setCandidate(updatedCandidate)
+      
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to deactivate resume",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleHardDeleteResume = async (resumeId: number, fileName: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete "${fileName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await api.hardDeleteResume(resumeId)
+      
+      toast({
+        title: "Success",
+        description: "Resume has been permanently deleted",
+      })
+      
+      // Reload the candidate data
+      const updatedCandidate = await api.getCandidate(candidateId, true)
+      setCandidate(updatedCandidate)
+      
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete resume",
         variant: "destructive",
       })
     }
@@ -975,37 +1067,117 @@ export default function EditCandidatePage() {
         <TabsContent value="resumes">
           <Card>
             <CardHeader>
-              <CardTitle>Resumes</CardTitle>
-              <CardDescription>
-                Uploaded resume files
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Resumes</CardTitle>
+                  <CardDescription>
+                    Uploaded resume files (sorted by upload date)
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="resume-upload" className="cursor-pointer">
+                    <Button variant="outline" size="sm" asChild>
+                      <span>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Upload Resume
+                      </span>
+                    </Button>
+                  </label>
+                  <input
+                    id="resume-upload"
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={handleResumeUpload}
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
+              {uploading && (
+                <div className="flex items-center justify-center py-4 border rounded-lg mb-4 bg-blue-50">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <span className="text-sm text-blue-600">Uploading resume...</span>
+                </div>
+              )}
+              
               {candidate.resumes && candidate.resumes.length > 0 ? (
                 <div className="space-y-3">
-                  {candidate.resumes.map((resume) => (
-                    <div key={resume.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  {/* Sort resumes by upload_date descending (newest first) */}
+                  {[...candidate.resumes]
+                    .sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())
+                    .map((resume, index) => (
+                    <div key={resume.id} className="flex items-center justify-between p-3 border rounded-lg bg-white hover:bg-gray-50">
                       <div className="flex items-center space-x-3">
                         <FileText className="w-5 h-5 text-gray-500" />
                         <div>
-                          <div className="text-sm font-medium">{resume.file_name}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-medium">{resume.file_name}</div>
+                            {index === 0 && (
+                              <Badge variant="secondary" className="text-xs">Latest</Badge>
+                            )}
+                          </div>
                           <div className="text-xs text-gray-500">
-                            {Math.round(resume.file_size / 1024)} KB • {resume.content_type}
+                            {Math.round(resume.file_size / 1024)} KB • {resume.content_type} • 
+                            Uploaded {new Date(resume.upload_date).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleDownloadResume(resume.id, resume.file_name)}
-                      >
-                        Download
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleDownloadResume(resume.id, resume.file_name)}
+                        >
+                          Download
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem 
+                              onClick={() => handleSoftDeleteResume(resume.id)}
+                              className="text-orange-600 hover:text-orange-700"
+                            >
+                              <UserX className="w-4 h-4 mr-2" />
+                              Deactivate Resume
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleHardDeleteResume(resume.id, resume.file_name)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Permanently
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">No resumes uploaded</p>
+                <div className="text-center py-8">
+                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 mb-4">No resumes uploaded</p>
+                  <label htmlFor="resume-upload-empty" className="cursor-pointer">
+                    <Button variant="outline" asChild>
+                      <span>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Upload First Resume
+                      </span>
+                    </Button>
+                  </label>
+                  <input
+                    id="resume-upload-empty"
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={handleResumeUpload}
+                  />
+                </div>
               )}
             </CardContent>
           </Card>
