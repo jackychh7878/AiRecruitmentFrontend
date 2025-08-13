@@ -134,8 +134,8 @@ export default function PromptTemplatesPage() {
       )
 
       if (response.success) {
-        toast({
-          title: "Bulk Regeneration Started",
+      toast({
+        title: "Bulk Regeneration Started",
           description: `Job ${response.job_id} started. AI summaries are being regenerated for all candidates.`,
         })
 

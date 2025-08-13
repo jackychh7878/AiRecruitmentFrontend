@@ -123,11 +123,11 @@ export interface Education {
 export interface LicenseCertification {
   id: number
   candidate_id: number
-  license_certification_name: string
-  issuing_organisation: string
+  license_certification_name: string  // Matches backend database field name
+  issuing_organisation: string        // Matches backend database field name
   issue_date: string
-  expiry_date?: string
-  is_no_expiry: boolean
+  expiry_date?: string               // Matches backend database field name
+  is_no_expiry?: boolean
   description?: string
   is_active: boolean
   created_date: string
@@ -784,25 +784,46 @@ class ApiClient {
 
   // Licenses & Certifications CRUD
   async getLicensesCertifications(candidateId: number) {
-    return this.request<LicenseCertification[]>(`/candidates/${candidateId}/licenses-certifications`)
+    return this.request<{ licenses_certifications: LicenseCertification[], total: number }>(`/licenses_certifications/candidate/${candidateId}`)
   }
 
   async createLicenseCertification(candidateId: number, data: Partial<LicenseCertification>) {
-    return this.request<LicenseCertification>(`/candidates/${candidateId}/licenses-certifications`, {
+    // Send data with field names that match the backend database model
+    const payload = {
+      candidate_id: candidateId,
+      license_certification_name: data.license_certification_name,
+      issuing_organisation: data.issuing_organisation,
+      issue_date: data.issue_date,
+      expiry_date: data.expiry_date,
+      is_no_expiry: data.is_no_expiry,
+      description: data.description,
+    }
+    return this.request<LicenseCertification>(`/licenses_certifications/`, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
   }
 
   async updateLicenseCertification(candidateId: number, certificationId: number, data: Partial<LicenseCertification>) {
-    return this.request<LicenseCertification>(`/candidates/${candidateId}/licenses-certifications/${certificationId}`, {
+    // Send data with field names that match the backend database model
+    const payload = {
+      candidate_id: candidateId,
+      license_certification_name: data.license_certification_name,
+      issuing_organisation: data.issuing_organisation,
+      issue_date: data.issue_date,
+      expiry_date: data.expiry_date,
+      is_no_expiry: data.is_no_expiry,
+      description: data.description,
+      is_active: data.is_active,
+    }
+    return this.request<LicenseCertification>(`/licenses_certifications/${certificationId}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
   }
 
   async deleteLicenseCertification(candidateId: number, certificationId: number) {
-    return this.request(`/candidates/${candidateId}/licenses-certifications/${certificationId}`, {
+    return this.request(`/licenses_certifications/${certificationId}`, {
       method: "DELETE",
     })
   }
