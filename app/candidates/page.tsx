@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
-import { api, type CandidateProfile, type PaginationInfo, CITIZENSHIP_OPTIONS } from "@/lib/api"
+import { api, type CandidateProfile, type PaginationInfo } from "@/lib/api"
+import { useCitizenshipCodes } from "@/hooks/use-lookup-codes"
 import { testBackendConnection, type ConnectionTestResult } from "@/lib/connection-test"
 import { Plus, Search, MoreVertical, Eye, Edit, UserX, Trash2, ChevronLeft, ChevronRight, Loader2, AlertTriangle, CheckCircle, Wifi, UserCircle } from "lucide-react"
 import Link from "next/link"
@@ -42,6 +43,9 @@ export default function CandidatesPage() {
   const [connectionTest, setConnectionTest] = useState<ConnectionTestResult | null>(null)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
   const { toast } = useToast()
+
+  // Fetch citizenship codes dynamically
+  const { codes: citizenshipCodes, loading: citizenshipLoading } = useCitizenshipCodes()
 
   // Test connection on component mount
   useEffect(() => {
@@ -240,16 +244,16 @@ export default function CandidatesPage() {
         <Select 
           value={citizenshipFilter || "all"} 
           onValueChange={(value) => setCitizenshipFilter(value === "all" ? "" : value)}
-          disabled={loading}
+          disabled={loading || citizenshipLoading}
         >
           <SelectTrigger className="w-64">
             <SelectValue placeholder="Filter by citizenship" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All citizenship types</SelectItem>
-            {CITIZENSHIP_OPTIONS.map((option) => (
-              <SelectItem key={option} value={option}>
-                {option}
+            {citizenshipCodes.map((code) => (
+              <SelectItem key={code.id} value={code.com_code}>
+                {code.com_code}
               </SelectItem>
             ))}
           </SelectContent>
@@ -381,6 +385,18 @@ export default function CandidatesPage() {
                       {candidate.citizenship && (
                         <Badge variant="default" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
                           {candidate.citizenship}
+                        </Badge>
+                      )}
+                      {candidate.preferred_work_types && (
+                        candidate.preferred_work_types.split(',').slice(0, 2).map((type, index) => (
+                          <Badge key={index} variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            {type.trim()}
+                          </Badge>
+                        ))
+                      )}
+                      {candidate.preferred_work_types && candidate.preferred_work_types.split(',').length > 2 && (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-600">
+                          +{candidate.preferred_work_types.split(',').length - 2} more
                         </Badge>
                       )}
                     </div>

@@ -2,16 +2,40 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 const API_TIMEOUT = Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000
 
-// Citizenship options based on Hong Kong SARS categories
-export const CITIZENSHIP_OPTIONS = [
-  "Hong Kong SARS Permanent Resident",
-  "Hong Kong SARS Citizen",
-  "Hong Kong SARS temporary visa with restrictions on industry (e.g. TeachTAS)",
-  "Hong Kong SARS temporary visa (e.g. QMAS, TTPS, IANG)",
-  "Require sponsorship to work for a new employer in Hong Kong SARS"
-] as const
+// Lookup code interfaces and constants
+export interface LookupCode {
+  id: number
+  category: string
+  com_code: string
+  description: string
+  is_active: boolean
+  created_date: string
+  last_modified_date: string
+}
 
-export type CitizenshipType = typeof CITIZENSHIP_OPTIONS[number]
+export interface LookupResponse {
+  category: string
+  codes: LookupCode[]
+}
+
+export const LOOKUP_CATEGORIES = {
+  CLASSIFICATION_OF_INTEREST: "Classification of interest",
+  LANGUAGE: "Language",
+  LANGUAGE_PROFICIENCY: "Language proficiencey", // Note: keeping the typo as per API
+  PREFERRED_WORK_TYPES: "Preferred work types",
+  SUB_CLASSIFICATION_OF_INTEREST: "Sub classification of interest",
+  CITIZENSHIP: "Your citizenship and visas"
+} as const
+
+// Utility functions for multi-select fields
+export const convertStringToArray = (value?: string | null): string[] => {
+  if (!value) return []
+  return value.split(',').map(item => item.trim()).filter(item => item.length > 0)
+}
+
+export const convertArrayToString = (values: string[]): string => {
+  return values.filter(value => value.length > 0).join(', ')
+}
 
 export interface ApiResponse<T = any> {
   success?: boolean
@@ -543,6 +567,11 @@ class ApiClient {
       system_capacity: string
       estimated_processing_time_per_profile: string
     }>("/candidates/ai-summary/bulk-regenerate/stats")
+  }
+
+  // Lookup codes API
+  async getLookupCodes(category: string) {
+    return this.request<LookupResponse>(`/lookups/${encodeURIComponent(category)}`)
   }
 }
 

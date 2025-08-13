@@ -33,7 +33,7 @@ html {
 }
         `}</style>
       </head>
-      <body className="min-h-screen bg-gray-50">
+      <body className="min-h-screen bg-gray-50" suppressHydrationWarning={true}>
         <Navigation />
         <main className="flex-1">{children}</main>
         <Toaster />

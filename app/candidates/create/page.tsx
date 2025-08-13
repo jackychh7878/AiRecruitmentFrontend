@@ -13,8 +13,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
-import { api, type CandidateProfile, CITIZENSHIP_OPTIONS } from "@/lib/api"
+import { api, type CandidateProfile, convertStringToArray, convertArrayToString } from "@/lib/api"
+import { useCitizenshipCodes, useClassificationCodes, useSubClassificationCodes, usePreferredWorkTypesCodes } from "@/hooks/use-lookup-codes"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MultiSelect } from "@/components/ui/multi-select"
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 
 type CreationStep = "upload" | "parsing" | "review" | "creating" | "finalizing" | "complete"
@@ -28,6 +30,16 @@ export default function CreateCandidatePage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+
+  // Fetch lookup codes dynamically
+  const { codes: citizenshipCodes, loading: citizenshipLoading } = useCitizenshipCodes()
+  const { codes: classificationCodes, loading: classificationLoading } = useClassificationCodes()
+  const { codes: subClassificationCodes, loading: subClassificationLoading } = useSubClassificationCodes()
+  const { codes: workTypesCodes, loading: workTypesLoading } = usePreferredWorkTypesCodes()
+
+  // Convert work types for multi-select
+  const selectedWorkTypes = convertStringToArray(formData.preferred_work_types)
+  const workTypesOptions = workTypesCodes.map(code => ({ value: code.com_code, label: code.com_code }))
 
   // Helper to set step (keeping for consistency)
   const setStepWithDebug = (newStep: CreationStep) => {
@@ -83,6 +95,11 @@ export default function CreateCandidatePage() {
 
   const handleFormChange = (field: keyof CandidateProfile, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleWorkTypesChange = (values: string[]) => {
+    const joinedValues = convertArrayToString(values)
+    handleFormChange("preferred_work_types", joinedValues)
   }
 
   const handleCreateProfile = async () => {
@@ -319,34 +336,59 @@ export default function CreateCandidatePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="classification_of_interest">Classification</Label>
-                  <Input
-                    id="classification_of_interest"
-                    value={formData.classification_of_interest || ""}
-                    onChange={(e) => handleFormChange("classification_of_interest", e.target.value)}
-                  />
+                  <Select
+                    value={formData.classification_of_interest || "not-specified"}
+                    onValueChange={(value) => handleFormChange("classification_of_interest", value === "not-specified" ? "" : value)}
+                    disabled={classificationLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select classification" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="not-specified">-- Not specified --</SelectItem>
+                      {classificationCodes.map((code) => (
+                        <SelectItem key={code.id} value={code.com_code}>
+                          {code.com_code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="sub_classification_of_interest">Sub-classification</Label>
-                  <Input
-                    id="sub_classification_of_interest"
-                    value={formData.sub_classification_of_interest || ""}
-                    onChange={(e) => handleFormChange("sub_classification_of_interest", e.target.value)}
-                  />
+                  <Select
+                    value={formData.sub_classification_of_interest || "not-specified"}
+                    onValueChange={(value) => handleFormChange("sub_classification_of_interest", value === "not-specified" ? "" : value)}
+                    disabled={subClassificationLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select sub-classification" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="not-specified">-- Not specified --</SelectItem>
+                      {subClassificationCodes.map((code) => (
+                        <SelectItem key={code.id} value={code.com_code}>
+                          {code.com_code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="citizenship">Citizenship / Work Status</Label>
                   <Select
                     value={formData.citizenship || "not-specified"}
                     onValueChange={(value) => handleFormChange("citizenship", value === "not-specified" ? "" : value)}
+                    disabled={citizenshipLoading}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select citizenship status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="not-specified">-- Not specified --</SelectItem>
-                      {CITIZENSHIP_OPTIONS.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
+                      {citizenshipCodes.map((code) => (
+                        <SelectItem key={code.id} value={code.com_code}>
+                          {code.com_code}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -363,11 +405,12 @@ export default function CreateCandidatePage() {
                 </div>
                 <div>
                   <Label htmlFor="preferred_work_types">Preferred Work Types</Label>
-                  <Input
-                    id="preferred_work_types"
-                    value={formData.preferred_work_types || ""}
-                    onChange={(e) => handleFormChange("preferred_work_types", e.target.value)}
-                    placeholder="Remote, Hybrid, On-site"
+                  <MultiSelect
+                    options={workTypesOptions}
+                    value={selectedWorkTypes}
+                    onChange={handleWorkTypesChange}
+                    placeholder="Select work types..."
+                    disabled={workTypesLoading}
                   />
                 </div>
               </div>
