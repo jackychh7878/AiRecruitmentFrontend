@@ -287,7 +287,8 @@ export default function SemanticSearchPage() {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">{searchStats.default_confidence_threshold}</div>
-                <div className="text-sm text-gray-600">Default Threshold</div>
+                <div className="text-sm text-gray-600">Default Semantic Score Weight</div>
+                <div className="text-sm text-gray-600">({searchStats.default_confidence_threshold} × semantic_score + (1 - {searchStats.default_confidence_threshold}) × keyword_score)</div>
               </div>
             </div>
             <div className="mt-4">
