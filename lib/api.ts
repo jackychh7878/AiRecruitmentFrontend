@@ -1,6 +1,37 @@
 // API configuration and utilities
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
-const API_TIMEOUT = Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000
+// Note: These are fallback values. The actual values will be loaded from runtime config
+let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+let API_TIMEOUT = Number(process.env.NEXT_PUBLIC_API_TIMEOUT) || 30000
+
+// Global API client instance that will be updated
+let globalApiClient: ApiClient | null = null
+
+// Function to update API configuration at runtime
+export function updateApiConfig(baseUrl: string, timeout: number) {
+  API_BASE_URL = baseUrl
+  API_TIMEOUT = timeout
+  
+  // Create a new API client instance with updated configuration
+  globalApiClient = new ApiClient(baseUrl, timeout)
+  
+  console.log('API configuration updated:', { baseUrl, timeout })
+}
+
+// Function to get current API configuration
+export function getApiConfig() {
+  return {
+    baseUrl: API_BASE_URL,
+    timeout: API_TIMEOUT
+  }
+}
+
+// Function to get the current API client instance
+export function getApiClient(): ApiClient {
+  if (!globalApiClient) {
+    globalApiClient = new ApiClient(API_BASE_URL, API_TIMEOUT)
+  }
+  return globalApiClient
+}
 
 // Lookup code interfaces and constants
 export interface LookupCode {
@@ -198,8 +229,25 @@ class ApiClient {
     this.timeout = timeout
   }
 
+  // Getter methods to access private properties
+  get baseUrl(): string {
+    return this.baseURL
+  }
+
+  get timeoutValue(): number {
+    return this.timeout
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
+    
+    // Debug logging
+    console.log('🌐 API Request:', {
+      baseURL: this.baseURL,
+      endpoint,
+      fullURL: url,
+      timestamp: new Date().toISOString()
+    });
 
     // Create abort controller for timeout
     const controller = new AbortController()
@@ -920,4 +968,4 @@ class ApiClient {
   }
 }
 
-export const api = new ApiClient()
+export const api = getApiClient()

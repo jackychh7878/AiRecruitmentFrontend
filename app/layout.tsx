@@ -4,6 +4,7 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { Navigation } from "@/components/layout/navigation"
 import { Toaster } from "@/components/ui/toaster"
+import { ConfigProvider } from "@/components/config-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -34,9 +35,11 @@ html {
         `}</style>
       </head>
       <body className="min-h-screen bg-gray-50" suppressHydrationWarning={true}>
-        <Navigation />
-        <main className="flex-1">{children}</main>
-        <Toaster />
+        <ConfigProvider>
+          <Navigation />
+          <main className="flex-1">{children}</main>
+          <Toaster />
+        </ConfigProvider>
       </body>
     </html>
   )

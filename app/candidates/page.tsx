@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
-import { api, type CandidateProfile, type PaginationInfo } from "@/lib/api"
+import { useApi } from "@/hooks/use-api"
+import { type CandidateProfile, type PaginationInfo } from "@/lib/api"
 import { useCitizenshipCodes } from "@/hooks/use-lookup-codes"
 import { testBackendConnection, type ConnectionTestResult } from "@/lib/connection-test"
 import { Plus, Search, MoreVertical, Eye, Edit, UserX, Trash2, ChevronLeft, ChevronRight, Loader2, AlertTriangle, CheckCircle, Wifi, UserCircle } from "lucide-react"
@@ -43,6 +44,7 @@ export default function CandidatesPage() {
   const [connectionTest, setConnectionTest] = useState<ConnectionTestResult | null>(null)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
   const { toast } = useToast()
+  const api = useApi() // Use the hook to get the current API client
 
   // Fetch citizenship codes dynamically
   const { codes: citizenshipCodes, loading: citizenshipLoading } = useCitizenshipCodes()
