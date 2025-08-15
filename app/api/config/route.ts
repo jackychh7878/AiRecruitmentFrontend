@@ -1,5 +1,23 @@
 export async function GET() {
   try {
+    // Log environment variables for debugging (only in debug mode)
+    const isDebug = process.env.NEXT_PUBLIC_DEBUG === 'true'
+    
+    if (isDebug) {
+      console.log('🔍 Environment Variables Debug:', {
+        NODE_ENV: process.env.NODE_ENV,
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+        NEXT_PUBLIC_DEBUG: process.env.NEXT_PUBLIC_DEBUG,
+        // Log all NEXT_PUBLIC_ variables
+        allNextPublicVars: Object.keys(process.env)
+          .filter(key => key.startsWith('NEXT_PUBLIC_'))
+          .reduce((acc, key) => {
+            acc[key] = process.env[key]
+            return acc
+          }, {} as Record<string, string | undefined>)
+      })
+    }
+
     // Return runtime configuration that can be accessed by the frontend
     const config = {
       apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
@@ -17,6 +35,10 @@ export async function GET() {
       timestamp: new Date().toISOString()
     };
 
+    if (isDebug) {
+      console.log('📤 Config Response:', config)
+    }
+
     return Response.json(config, { 
       status: 200,
       headers: {
@@ -26,6 +48,7 @@ export async function GET() {
       }
     });
   } catch (error) {
+    console.error('❌ Config Route Error:', error)
     return Response.json(
       { 
         error: 'Failed to load configuration',

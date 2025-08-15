@@ -968,4 +968,11 @@ class ApiClient {
   }
 }
 
-export const api = getApiClient()
+// Export a proxy that always delegates to the current API client instance
+export const api = new Proxy({} as ApiClient, {
+  get(target, prop) {
+    const currentClient = getApiClient()
+    const value = (currentClient as any)[prop]
+    return typeof value === 'function' ? value.bind(currentClient) : value
+  }
+})
