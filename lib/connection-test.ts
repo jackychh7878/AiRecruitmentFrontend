@@ -1,7 +1,7 @@
 // Connection test utility for debugging API issues
 
 import React from 'react'
-import { api } from './api'
+import { getApiClient } from './api'
 
 export interface ConnectionTestResult {
   isConnected: boolean
@@ -11,11 +11,12 @@ export interface ConnectionTestResult {
 }
 
 export async function testBackendConnection(): Promise<ConnectionTestResult> {
-  const endpoint = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+  const apiClient = getApiClient()
+  const endpoint = apiClient.baseUrl
   const startTime = Date.now()
   
   try {
-    // Try a simple health check endpoint
+    // Try a simple health check endpoint using a minimal candidates request
     const response = await fetch(`${endpoint}/candidates?page=1&per_page=1`, {
       method: 'GET',
       headers: {
