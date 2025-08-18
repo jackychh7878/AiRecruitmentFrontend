@@ -8,13 +8,27 @@ let globalApiClient: ApiClient | null = null
 
 // Function to update API configuration at runtime
 export function updateApiConfig(baseUrl: string, timeout: number) {
+  console.log('📝 updateApiConfig called:', {
+    oldBaseUrl: API_BASE_URL,
+    newBaseUrl: baseUrl,
+    oldTimeout: API_TIMEOUT,
+    newTimeout: timeout,
+    oldGlobalClient: globalApiClient ? globalApiClient.baseUrl : 'null',
+    timestamp: new Date().toISOString()
+  });
+  
   API_BASE_URL = baseUrl
   API_TIMEOUT = timeout
   
   // Create a new API client instance with updated configuration
   globalApiClient = new ApiClient(baseUrl, timeout)
   
-  console.log('API configuration updated:', { baseUrl, timeout })
+  console.log('✅ API configuration updated:', { 
+    baseUrl, 
+    timeout,
+    newGlobalClient: globalApiClient.baseUrl,
+    timestamp: new Date().toISOString()
+  })
 }
 
 // Function to get current API configuration
@@ -28,8 +42,16 @@ export function getApiConfig() {
 // Function to get the current API client instance
 export function getApiClient(): ApiClient {
   if (!globalApiClient) {
+    console.log('🔧 Creating new API client with:', { API_BASE_URL, API_TIMEOUT })
     globalApiClient = new ApiClient(API_BASE_URL, API_TIMEOUT)
   }
+  
+  console.log('🔍 getApiClient returning:', {
+    baseUrl: globalApiClient.baseUrl,
+    timeout: globalApiClient.timeoutValue,
+    timestamp: new Date().toISOString()
+  })
+  
   return globalApiClient
 }
 

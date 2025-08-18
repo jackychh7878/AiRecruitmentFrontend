@@ -11,7 +11,9 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { api, type CandidateProfile } from "@/lib/api"
+import { useApi } from "@/hooks/use-api"
+import { useConfig } from "@/components/config-provider"
+import { type CandidateProfile } from "@/lib/api"
 import {
   Edit,
   Phone,
@@ -30,6 +32,8 @@ import Link from "next/link"
 export default function CandidateDetailsPage() {
   const params = useParams()
   const router = useRouter()
+  const api = useApi()
+  const { loading: configLoading, config } = useConfig()
   const [candidate, setCandidate] = useState<CandidateProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
@@ -38,11 +42,46 @@ export default function CandidateDetailsPage() {
 
   useEffect(() => {
     const loadCandidate = async () => {
+      // Wait for config to be loaded and ensure we have a production API URL
+      if (configLoading) {
+        console.log('Config still loading, waiting...')
+        return
+      }
+
+      if (!config?.apiUrl || config.apiUrl.includes('localhost')) {
+        console.log('API URL not ready or still localhost:', config?.apiUrl)
+        // In production, if we're still getting localhost, something is wrong
+        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+          console.warn('⚠️ Production site still getting localhost API URL, this may indicate a configuration issue')
+        }
+        return
+      }
+
       try {
         setLoading(true)
+        console.log('Loading candidate with API config:', {
+          configLoaded: !configLoading,
+          apiUrl: config?.apiUrl,
+          apiClientBaseUrl: api.baseUrl,
+          candidateId,
+          timestamp: new Date().toISOString()
+        })
+        
+        // Double-check that the API client has the correct URL
+        if (api.baseUrl.includes('localhost')) {
+          console.error('❌ API client still has localhost URL:', api.baseUrl)
+          toast({
+            title: "Configuration Error",
+            description: "API client not properly configured. Please refresh the page.",
+            variant: "destructive",
+          })
+          return
+        }
+        
         const response = await api.getCandidate(candidateId, true)
         setCandidate(response)
       } catch (error) {
+        console.error('Failed to load candidate:', error)
         toast({
           title: "Error",
           description: "Failed to load candidate details",
@@ -54,10 +93,10 @@ export default function CandidateDetailsPage() {
       }
     }
 
-    if (candidateId) {
+    if (candidateId && !configLoading && config?.apiUrl && !config.apiUrl.includes('localhost')) {
       loadCandidate()
     }
-  }, [candidateId, router, toast])
+  }, [candidateId, router, toast, api, configLoading, config])
 
   const handleDownloadResume = async (resumeId: number, fileName: string) => {
     try {
@@ -88,11 +127,16 @@ export default function CandidateDetailsPage() {
     }
   }
 
-  if (loading) {
+  if (loading || configLoading) {
     return (
       <div className="container mx-auto px-4 py-6">
         <div className="flex justify-center items-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin" />
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-gray-600">
+              {configLoading ? 'Loading configuration...' : 'Loading candidate...'}
+            </p>
+          </div>
         </div>
       </div>
     )

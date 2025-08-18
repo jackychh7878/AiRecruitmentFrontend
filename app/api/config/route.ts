@@ -41,8 +41,16 @@ export async function GET() {
       enableTypewriter: process.env.NEXT_PUBLIC_ENABLE_TYPEWRITER !== 'false'
     };
 
+    // Always log the API URL in production for debugging
+    console.log('📤 Config API Response:', {
+      apiUrl: config.apiUrl,
+      environment: config.environment,
+      envVar: process.env.NEXT_PUBLIC_API_URL,
+      timestamp: config.timestamp
+    })
+    
     if (isDebug) {
-      console.log('📤 Config Response:', config)
+      console.log('📤 Full Config Response:', config)
     }
 
     return Response.json(config, { 

@@ -7,7 +7,17 @@ import { useConfig } from '@/components/config-provider';
  * This ensures the API client always uses the latest configuration
  */
 export function useApi() {
-  const { configVersion } = useConfig();
+  const { configVersion, config, loading } = useConfig();
   
-  return useMemo(() => getApiClient(), [configVersion]);
+  return useMemo(() => {
+    const apiClient = getApiClient();
+    console.log('🔧 useApi: Getting API client', {
+      configVersion,
+      configLoading: loading,
+      apiUrl: config?.apiUrl,
+      clientBaseUrl: apiClient.baseUrl,
+      timestamp: new Date().toISOString()
+    });
+    return apiClient;
+  }, [configVersion, config?.apiUrl, loading]);
 } 

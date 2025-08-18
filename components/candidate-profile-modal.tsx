@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { api, type CandidateProfile } from "@/lib/api"
+import { useApi } from "@/hooks/use-api"
+import { useConfig } from "@/components/config-provider"
+import { type CandidateProfile } from "@/lib/api"
 import {
   User,
   Mail,
@@ -31,17 +33,21 @@ interface CandidateProfileModalProps {
 }
 
 export function CandidateProfileModal({ candidateId, isOpen, onClose }: CandidateProfileModalProps) {
+  const api = useApi()
+  const { loading: configLoading } = useConfig()
   const [candidate, setCandidate] = useState<CandidateProfile | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (candidateId && isOpen) {
+    if (candidateId && isOpen && !configLoading) {
       fetchCandidateProfile(candidateId)
     }
-  }, [candidateId, isOpen])
+  }, [candidateId, isOpen, configLoading])
 
   const fetchCandidateProfile = async (id: number) => {
+    if (configLoading) return
+    
     setLoading(true)
     setError(null)
     

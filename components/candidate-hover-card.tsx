@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { api, type CandidateProfile } from "@/lib/api"
+import { useApi } from "@/hooks/use-api"
+import { useConfig } from "@/components/config-provider"
+import { type CandidateProfile } from "@/lib/api"
 import {
   User,
   Mail,
@@ -26,13 +28,15 @@ interface CandidateHoverCardProps {
 }
 
 export function CandidateHoverCard({ candidateId, children, onViewFullProfile }: CandidateHoverCardProps) {
+  const api = useApi()
+  const { loading: configLoading } = useConfig()
   const [candidate, setCandidate] = useState<CandidateProfile | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasLoaded, setHasLoaded] = useState(false)
 
   const fetchCandidateProfile = async () => {
-    if (hasLoaded || loading) return
+    if (hasLoaded || loading || configLoading) return
     
     setLoading(true)
     setError(null)
