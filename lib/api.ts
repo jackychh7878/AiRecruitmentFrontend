@@ -219,6 +219,17 @@ export interface SearchOptions {
   include_relationships?: boolean
 }
 
+// Chatbot interfaces
+export interface ChatbotMessage {
+  sessionId: string
+  query: string
+  attachment?: File
+}
+
+export interface ChatbotResponse {
+  response: string
+}
+
 // API client class
 class ApiClient {
   private baseURL: string
@@ -965,6 +976,120 @@ class ApiClient {
     return this.request(`/languages/${languageId}`, {
       method: "DELETE",
     })
+  }
+
+  // Chatbot webhook methods
+  async sendChatbotMessage(message: ChatbotMessage): Promise<ChatbotResponse> {
+    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL
+    const authKey = process.env.NEXT_PUBLIC_N8N_AUTH_KEY
+    const authValue = process.env.NEXT_PUBLIC_N8N_AUTH_VALUE
+
+    if (!webhookUrl || !authKey || !authValue) {
+      throw new Error('N8N webhook configuration is missing. Please check environment variables.')
+    }
+
+    // Validate PDF file if attachment is provided
+    if (message.attachment) {
+      if (message.attachment.type !== 'application/pdf') {
+        throw new Error('Only PDF files are allowed as attachments.')
+      }
+    }
+
+    try {
+      let body: FormData | string
+      let headers: Record<string, string> = {
+        [authKey]: authValue,
+      }
+
+      if (message.attachment) {
+        // Use FormData for file uploads
+        const formData = new FormData()
+        formData.append('sessionId', message.sessionId)
+        formData.append('query', message.query)
+        formData.append('attachment', message.attachment)
+        body = formData
+        // Don't set Content-Type header for FormData, let browser set it
+        console.log('Sending FormData request:', {
+          sessionId: message.sessionId,
+          query: message.query,
+          fileName: message.attachment.name,
+          fileSize: message.attachment.size
+        })
+      } else {
+        // Use JSON for text-only messages
+        headers['Content-Type'] = 'application/json'
+        const requestData = {
+          sessionId: message.sessionId,
+          query: message.query
+        }
+        body = JSON.stringify(requestData)
+        console.log('Sending JSON request:', requestData)
+      }
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers,
+        body,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        let errorMessage = `Webhook request failed: ${response.status} ${response.statusText}`
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.message || errorMessage
+        } catch {
+          // If JSON parsing fails, use the default error message
+        }
+        throw new Error(errorMessage)
+      }
+
+      // Get response text first
+      const responseText = await response.text()
+      
+      if (!responseText || responseText.trim() === '') {
+        throw new Error('Empty response received from webhook')
+      }
+
+      // Try to parse JSON
+      let data
+      try {
+        data = JSON.parse(responseText)
+      } catch (jsonError) {
+        console.error('JSON parsing error:', jsonError)
+        console.error('Response text:', responseText)
+        throw new Error('Invalid JSON response from webhook. Expected format: {"response": "..."}')
+      }
+
+      // Validate response format
+      if (!data || typeof data.response !== 'string') {
+        console.error('Invalid response format:', data)
+        throw new Error('Invalid response format. Expected: {"response": "..."}')
+      }
+
+      console.log('Webhook response received:', {
+        originalText: responseText,
+        parsedData: data,
+        finalResponse: data.response
+      })
+
+      return {
+        response: data.response
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Chatbot request timeout')
+        }
+        throw error
+      }
+      throw new Error('Unknown error occurred while sending message to chatbot')
+    }
   }
 }
 
