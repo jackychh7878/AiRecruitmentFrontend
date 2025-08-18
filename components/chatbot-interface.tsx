@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
+import { useRuntimeConfig } from "@/hooks/use-runtime-config"
 import { api, type SemanticSearchResult, type ChatbotMessage, type ChatbotResponse } from "@/lib/api"
 import { generateSessionId, formatChatbotResponse } from "@/lib/utils"
 import { CandidateHoverCard } from "@/components/candidate-hover-card"
@@ -39,6 +40,7 @@ interface ChatbotInterfaceProps {
 }
 
 export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
+  const { config, loading: configLoading } = useRuntimeConfig()
   const [sessionId, setSessionId] = useState<string>("")
   const [isInitialized, setIsInitialized] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -144,8 +146,8 @@ export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
     const words = content.split(' ')
     let currentIndex = 0
     
-    // Get typewriter speed from environment variable, default to 100ms
-    const typewriterSpeed = Number(process.env.NEXT_PUBLIC_TYPEWRITER_SPEED) || 100
+    // Get typewriter speed from runtime config
+    const typewriterSpeed = config.typewriterSpeed || 100
     
     // Add initial empty message
     const initialMessage: ChatMessage = {
@@ -192,11 +194,18 @@ export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
         attachment
       }
 
-      const response = await api.sendChatbotMessage(chatbotMessage)
+      // Pass runtime config to API call
+      const webhookConfig = {
+        n8nWebhookUrl: config.n8nWebhookUrl,
+        n8nAuthKey: config.n8nAuthKey,
+        n8nAuthValue: config.n8nAuthValue
+      }
+
+      const response = await api.sendChatbotMessage(chatbotMessage, webhookConfig)
       const formattedResponse = formatChatbotResponse(response.response)
       
-      // Check if typewriter effect is enabled
-      const typewriterEnabled = process.env.NEXT_PUBLIC_ENABLE_TYPEWRITER !== 'false'
+      // Check if typewriter effect is enabled from runtime config
+      const typewriterEnabled = config.enableTypewriter
       
       if (typewriterEnabled) {
         // Use typewriter effect for the response
@@ -345,6 +354,16 @@ export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
     console.log('New conversation started with session ID:', newSessionId)
   }
 
+  // Show loading state while config is loading
+  if (configLoading) {
+    return (
+      <div className={`flex flex-col h-full ${className} items-center justify-center`}>
+        <Loader2 className="w-6 h-6 animate-spin mb-2" />
+        <p className="text-sm text-gray-600">Loading chatbot configuration...</p>
+      </div>
+    )
+  }
+
   return (
     <div className={`flex flex-col h-full ${className}`}>
       {/* Chat Header */}
@@ -357,13 +376,13 @@ export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
             </CardTitle>
             <CardDescription>
               Upload a job description or describe your hiring needs to find the best candidates
-              {process.env.NEXT_PUBLIC_DEBUG === 'true' && (
+              {config.debug && (
                 <>
                   <br />
                   <span className="text-xs text-gray-500 font-mono">
                     Session: {sessionId || 'Initializing...'} | 
-                    Typewriter: {process.env.NEXT_PUBLIC_ENABLE_TYPEWRITER !== 'false' ? 
-                      `${process.env.NEXT_PUBLIC_TYPEWRITER_SPEED || 100}ms` : 'Off'}
+                    Typewriter: {config.enableTypewriter ? `${config.typewriterSpeed}ms` : 'Off'} |
+                    Webhook: {config.n8nWebhookUrl ? 'Configured' : 'Missing'}
                   </span>
                 </>
               )}

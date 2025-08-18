@@ -979,12 +979,27 @@ class ApiClient {
   }
 
   // Chatbot webhook methods
-  async sendChatbotMessage(message: ChatbotMessage): Promise<ChatbotResponse> {
-    const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL
-    const authKey = process.env.NEXT_PUBLIC_N8N_AUTH_KEY
-    const authValue = process.env.NEXT_PUBLIC_N8N_AUTH_VALUE
+  async sendChatbotMessage(
+    message: ChatbotMessage, 
+    config?: { n8nWebhookUrl: string; n8nAuthKey: string; n8nAuthValue: string }
+  ): Promise<ChatbotResponse> {
+    // Use provided config or fall back to process.env
+    const webhookUrl = config?.n8nWebhookUrl || process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL
+    const authKey = config?.n8nAuthKey || process.env.NEXT_PUBLIC_N8N_AUTH_KEY
+    const authValue = config?.n8nAuthValue || process.env.NEXT_PUBLIC_N8N_AUTH_VALUE
 
     if (!webhookUrl || !authKey || !authValue) {
+      console.error('N8N Configuration Debug:', {
+        webhookUrl: webhookUrl ? 'SET' : 'MISSING',
+        authKey: authKey ? 'SET' : 'MISSING', 
+        authValue: authValue ? 'SET' : 'MISSING',
+        configProvided: !!config,
+        envCheck: {
+          webhookFromEnv: process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL ? 'SET' : 'MISSING',
+          keyFromEnv: process.env.NEXT_PUBLIC_N8N_AUTH_KEY ? 'SET' : 'MISSING',
+          valueFromEnv: process.env.NEXT_PUBLIC_N8N_AUTH_VALUE ? 'SET' : 'MISSING'
+        }
+      })
       throw new Error('N8N webhook configuration is missing. Please check environment variables.')
     }
 

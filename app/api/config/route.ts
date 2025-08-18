@@ -32,7 +32,13 @@ export async function GET() {
       searchDebounce: parseInt(process.env.NEXT_PUBLIC_SEARCH_DEBOUNCE || '500'),
       apiTimeout: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '30000'),
       environment: process.env.NODE_ENV || 'unknown',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      // N8N Chatbot Configuration
+      n8nWebhookUrl: process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || '',
+      n8nAuthKey: process.env.NEXT_PUBLIC_N8N_AUTH_KEY || '',
+      n8nAuthValue: process.env.NEXT_PUBLIC_N8N_AUTH_VALUE || '',
+      typewriterSpeed: parseInt(process.env.NEXT_PUBLIC_TYPEWRITER_SPEED || '100'),
+      enableTypewriter: process.env.NEXT_PUBLIC_ENABLE_TYPEWRITER !== 'false'
     };
 
     if (isDebug) {

@@ -14,6 +14,12 @@ interface RuntimeConfig {
   apiTimeout: number;
   environment: string;
   timestamp: string;
+  // N8N Chatbot Configuration
+  n8nWebhookUrl: string;
+  n8nAuthKey: string;
+  n8nAuthValue: string;
+  typewriterSpeed: number;
+  enableTypewriter: boolean;
 }
 
 const defaultConfig: RuntimeConfig = {
@@ -29,7 +35,13 @@ const defaultConfig: RuntimeConfig = {
   searchDebounce: 500,
   apiTimeout: 30000,
   environment: 'development',
-  timestamp: new Date().toISOString()
+  timestamp: new Date().toISOString(),
+  // N8N Chatbot Configuration defaults
+  n8nWebhookUrl: '',
+  n8nAuthKey: '',
+  n8nAuthValue: '',
+  typewriterSpeed: 100,
+  enableTypewriter: true
 };
 
 export function useRuntimeConfig() {
