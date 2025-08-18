@@ -11,6 +11,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { api, type SemanticSearchResult, type ChatbotMessage, type ChatbotResponse } from "@/lib/api"
 import { generateSessionId, formatChatbotResponse } from "@/lib/utils"
+import { CandidateHoverCard } from "@/components/candidate-hover-card"
+import { CandidateProfileModal } from "@/components/candidate-profile-modal"
 import {
   MessageSquare,
   Send,
@@ -61,6 +63,10 @@ export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
   // Track when messages change to avoid auto-scroll on every update
   const [lastMessageCount, setLastMessageCount] = useState(1) // Start with 1 to account for welcome message
   const [hasUserInteracted, setHasUserInteracted] = useState(false)
+
+  // Candidate profile modal state
+  const [selectedCandidateId, setSelectedCandidateId] = useState<number | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const scrollToBottom = (force = false) => {
     if (!force && isUserScrolledUp) return
@@ -273,6 +279,48 @@ export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
     }
   }
 
+  // Parse candidate IDs from message content and create clickable buttons
+  const parseCandidateIds = (content: string): Array<{type: 'text', content: string} | {type: 'candidate', candidateId: number, content: string}> => {
+    const candidateIdRegex = /<candidate_id>(\d+)<\/candidate_id>/g
+    const parts: Array<{type: 'text', content: string} | {type: 'candidate', candidateId: number, content: string}> = []
+    let lastIndex = 0
+    let match
+
+    while ((match = candidateIdRegex.exec(content)) !== null) {
+      // Add text before the candidate_id tag
+      if (match.index > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: content.slice(lastIndex, match.index)
+        })
+      }
+
+      // Add candidate button
+      parts.push({
+        type: 'candidate',
+        candidateId: parseInt(match[1]),
+        content: match[0]
+      })
+
+      lastIndex = match.index + match[0].length
+    }
+
+    // Add remaining text
+    if (lastIndex < content.length) {
+      parts.push({
+        type: 'text',
+        content: content.slice(lastIndex)
+      })
+    }
+
+    return parts.length > 0 ? parts : [{ type: 'text', content }]
+  }
+
+  const handleCandidateClick = (candidateId: number) => {
+    setSelectedCandidateId(candidateId)
+    setIsModalOpen(true)
+  }
+
   const startNewConversation = () => {
     const newSessionId = generateSessionId()
     setSessionId(newSessionId)
@@ -363,10 +411,29 @@ export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
                       message.type === "system" ? "bg-gray-100 text-gray-700 border" : "bg-gray-100 text-gray-900"
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">
-                      {message.content}
+                    <div className="text-sm whitespace-pre-wrap">
+                      {parseCandidateIds(message.content).map((part, index) => (
+                        <span key={index}>
+                          {part.type === 'text' ? (
+                            part.content
+                          ) : (
+                            <CandidateHoverCard
+                              candidateId={(part as {type: 'candidate', candidateId: number, content: string}).candidateId}
+                              onViewFullProfile={() => handleCandidateClick((part as {type: 'candidate', candidateId: number, content: string}).candidateId)}
+                            >
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto p-0 text-blue-600 hover:text-blue-800 underline font-normal"
+                              >
+                                View Profile #{(part as {type: 'candidate', candidateId: number, content: string}).candidateId}
+                              </Button>
+                            </CandidateHoverCard>
+                          )}
+                        </span>
+                      ))}
                       {message.isTyping && <span className="animate-pulse">|</span>}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -486,6 +553,16 @@ export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
           </Button>
         </div>
       </div>
+
+      {/* Candidate Profile Modal */}
+      <CandidateProfileModal
+        candidateId={selectedCandidateId}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelectedCandidateId(null)
+        }}
+      />
     </div>
   )
 } 
