@@ -110,7 +110,7 @@ export function CandidateEntityModal({
         
       case 'language':
         if (!formData.language?.trim()) errors.push("Language is required")
-        if (!formData.proficiency_level?.trim()) errors.push("Proficiency level is required")
+        // Proficiency level is now optional
         break
     }
     
@@ -393,7 +393,7 @@ export function CandidateEntityModal({
               </Select>
             </div>
             <div>
-              <RequiredLabel htmlFor="proficiency_level">Proficiency Level</RequiredLabel>
+                              <Label htmlFor="proficiency_level">Proficiency Level</Label>
               <Select
                 value={formData.proficiency_level || ""}
                 onValueChange={(value) => handleInputChange("proficiency_level", value)}

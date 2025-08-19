@@ -337,7 +337,7 @@ export default function CreateCandidatePage() {
     
     languages.forEach((lang, index) => {
       if (!lang.language?.trim()) errors.push(`Language ${index + 1}: Language name is required`)
-      if (!lang.proficiency_level?.trim()) errors.push(`Language ${index + 1}: Proficiency level is required`)
+      // Proficiency level is now optional
     })
     
     console.log('Validation complete - Found errors:', errors)
