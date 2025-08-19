@@ -60,6 +60,10 @@ export default function EditCandidatePage() {
   const selectedWorkTypes = convertStringToArray(formData.preferred_work_types)
   const workTypesOptions = workTypesCodes.map(code => ({ value: code.com_code, label: code.com_code }))
 
+  // Convert role tags for multi-select (free-form tags)
+  const selectedRoleTags = convertStringToArray(formData.sub_classification_of_interest)
+  const roleTagsOptions: { value: string; label: string }[] = [] // No predefined options, allow free-form input
+
   // State for nested entities
   const [careerHistory, setCareerHistory] = useState<CareerHistory[]>([])
   const [skills, setSkills] = useState<Skills[]>([])
@@ -115,6 +119,11 @@ export default function EditCandidatePage() {
   const handleWorkTypesChange = (values: string[]) => {
     const joinedValues = convertArrayToString(values)
     handleInputChange("preferred_work_types", joinedValues)
+  }
+
+  const handleRoleTagsChange = (values: string[]) => {
+    const joinedValues = convertArrayToString(values)
+    handleInputChange("sub_classification_of_interest", joinedValues)
   }
 
   // CRUD handlers for nested entities
@@ -646,15 +655,14 @@ export default function EditCandidatePage() {
                 </div>
                 <div>
                   <Label htmlFor="sub_classification_of_interest">Role Tags</Label>
-                  <Input
-                    id="sub_classification_of_interest"
-                    type="text"
-                    placeholder="e.g., Developers, Programmers, Full Stack Engineers..."
-                    value={formData.sub_classification_of_interest || ""}
-                    onChange={(e) => handleInputChange("sub_classification_of_interest", e.target.value)}
+                  <MultiSelect
+                    options={roleTagsOptions}
+                    value={selectedRoleTags}
+                    onChange={handleRoleTagsChange}
+                    placeholder="Type and press Enter to add role tags..."
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Enter role tags separated by commas. These help categorize the candidate's preferred roles.
+                    Type custom role tags and press Enter to add them. These help categorize the candidate's preferred roles.
                   </p>
                 </div>
                 <div>

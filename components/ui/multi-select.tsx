@@ -50,6 +50,21 @@ export function MultiSelect({
     }
   }
 
+  const handleAddCustomValue = (customValue: string) => {
+    const trimmedValue = customValue.trim()
+    if (trimmedValue && !value.includes(trimmedValue)) {
+      onChange([...value, trimmedValue])
+      setInputValue("")
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && inputValue.trim()) {
+      e.preventDefault()
+      handleAddCustomValue(inputValue)
+    }
+  }
+
   const handleRemove = (valueToRemove: string) => {
     onChange(value.filter((v) => v !== valueToRemove))
   }
@@ -99,9 +114,37 @@ export function MultiSelect({
               placeholder="Search options..."
               value={inputValue}
               onValueChange={setInputValue}
+              onKeyDown={handleKeyDown}
             />
-            <CommandEmpty>No options found.</CommandEmpty>
+            <CommandEmpty>
+              {inputValue.trim() ? (
+                <div className="py-2 px-2">
+                  <button
+                    className="w-full text-left text-sm hover:bg-accent hover:text-accent-foreground rounded-sm px-2 py-1"
+                    onClick={() => handleAddCustomValue(inputValue)}
+                  >
+                    Add "{inputValue.trim()}"
+                  </button>
+                </div>
+              ) : (
+                "No options found."
+              )}
+            </CommandEmpty>
             <CommandGroup className="max-h-64 overflow-auto">
+              {/* Show option to add custom value if input doesn't match existing options */}
+              {inputValue.trim() && 
+               !filteredOptions.some(option => option.value.toLowerCase() === inputValue.toLowerCase()) &&
+               !value.includes(inputValue.trim()) && (
+                <CommandItem
+                  value={inputValue}
+                  onSelect={() => handleAddCustomValue(inputValue)}
+                  className="text-blue-600"
+                >
+                  <div className="mr-2 h-4 w-4" />
+                  Add "{inputValue.trim()}"
+                </CommandItem>
+              )}
+              
               {filteredOptions.map((option) => {
                 const isSelected = value.includes(option.value)
                 return (
