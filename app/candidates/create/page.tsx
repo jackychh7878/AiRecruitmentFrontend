@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -67,6 +67,16 @@ export default function CreateCandidatePage() {
 
   // Validation state
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+
+  // Re-validate when nested entities change
+  useEffect(() => {
+    if (step === "review") {
+      setTimeout(() => {
+        const updatedValidationErrors = validateForm()
+        setValidationErrors(updatedValidationErrors)
+      }, 100)
+    }
+  }, [languages, licensesCertifications, skills, education, careerHistory, step])
 
   // Helper to set step
   const setStepWithDebug = (newStep: CreationStep) => {
@@ -243,10 +253,12 @@ export default function CreateCandidatePage() {
     
     setEditingItem({ type: null, item: null, isNew: false })
     
-    // Refresh validation immediately after saving an item
+      // Refresh validation immediately after saving an item
+  setTimeout(() => {
     const updatedValidationErrors = validateForm()
     setValidationErrors(updatedValidationErrors)
-  }
+  }, 100)
+}
 
   const getEmptyItem = (type: 'career' | 'skill' | 'education' | 'certification' | 'language') => {
     switch (type) {
@@ -338,6 +350,11 @@ export default function CreateCandidatePage() {
     languages.forEach((lang, index) => {
       if (!lang.language?.trim()) errors.push(`Language ${index + 1}: Language name is required`)
       // Proficiency level is now optional
+      console.log(`Language ${index + 1} validation:`, {
+        language: lang.language,
+        proficiency_level: lang.proficiency_level,
+        isValid: !!lang.language?.trim()
+      })
     })
     
     console.log('Validation complete - Found errors:', errors)
