@@ -20,12 +20,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { useApi } from "@/hooks/use-api"
 import { type CandidateProfile, type PaginationInfo } from "@/lib/api"
 import { useCitizenshipCodes } from "@/hooks/use-lookup-codes"
 import { testBackendConnection, type ConnectionTestResult } from "@/lib/connection-test"
-import { Plus, Search, MoreVertical, Eye, Edit, UserX, Trash2, ChevronLeft, ChevronRight, Loader2, AlertTriangle, CheckCircle, Wifi, UserCircle } from "lucide-react"
+import { Plus, Search, MoreVertical, Eye, Edit, UserX, Trash2, ChevronLeft, ChevronRight, Loader2, AlertTriangle, CheckCircle, Wifi, UserCircle,
+UserCheck } from "lucide-react"
 import Link from "next/link"
 
 export default function CandidatesPage() {
@@ -39,8 +42,10 @@ export default function CandidatesPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [citizenshipFilter, setCitizenshipFilter] = useState<string>("")
+  const [showDeactivated, setShowDeactivated] = useState(true)
   const [deleteCandidate, setDeleteCandidate] = useState<CandidateProfile | null>(null)
   const [deactivateCandidate, setDeactivateCandidate] = useState<CandidateProfile | null>(null)
+  const [activateCandidate, setActivateCandidate] = useState<CandidateProfile | null>(null)
   const [connectionTest, setConnectionTest] = useState<ConnectionTestResult | null>(null)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
   const { toast } = useToast()
@@ -170,10 +175,10 @@ export default function CandidatesPage() {
 
   const handleDelete = async (candidate: CandidateProfile) => {
     try {
-      await api.deleteCandidate(candidate.id)
+      await api.hardDeleteCandidate(candidate.id)
       toast({
         title: "Success",
-        description: `${candidate.first_name} ${candidate.last_name} has been deleted`,
+        description: `${candidate.first_name} ${candidate.last_name} has been permanently deleted`,
       })
       loadCandidates(pagination?.page || 1, pagination?.per_page || 20)
     } catch (error) {
@@ -186,13 +191,35 @@ export default function CandidatesPage() {
     setDeleteCandidate(null)
   }
 
-  const filteredCandidates = candidates.filter(
-    (candidate) =>
+  const handleActivate = async (candidate: CandidateProfile) => {
+    try {
+      await api.updateCandidate(candidate.id, { is_active: true })
+      toast({
+        title: "Success",
+        description: `${candidate.first_name} ${candidate.last_name} has been reactivated`,
+      })
+      loadCandidates(pagination?.page || 1, pagination?.per_page || 20)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reactivate candidate",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const filteredCandidates = candidates.filter((candidate) => {
+    const matchesSearch = searchQuery === "" || 
       `${candidate.first_name || ''} ${candidate.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (candidate.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (candidate.classification_of_interest || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (candidate.citizenship || '').toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      (candidate.citizenship || '').toLowerCase().includes(searchQuery.toLowerCase())
+    
+    const matchesCitizenship = citizenshipFilter === "" || candidate.citizenship === citizenshipFilter
+    const matchesActiveStatus = showDeactivated || candidate.is_active
+    
+    return matchesSearch && matchesCitizenship && matchesActiveStatus
+  })
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -260,6 +287,17 @@ export default function CandidatesPage() {
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="show-deactivated"
+            checked={showDeactivated}
+            onCheckedChange={setShowDeactivated}
+            disabled={loading}
+          />
+          <Label htmlFor="show-deactivated" className="text-sm whitespace-nowrap">
+            Show deactivated
+          </Label>
+        </div>
         <Select 
           value={pagination?.per_page?.toString() || "20"} 
           onValueChange={handlePerPageChange}
@@ -329,21 +367,30 @@ export default function CandidatesPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
               {filteredCandidates.map((candidate) => (
-              <Card key={candidate.id} className="hover:shadow-md transition-shadow">
+              <Card key={candidate.id} className={`hover:shadow-md transition-shadow ${!candidate.is_active ? 'opacity-60 bg-gray-50 border-gray-200' : ''}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
-                      <Avatar>
+                      <Avatar className={!candidate.is_active ? 'opacity-60' : ''}>
                         <AvatarFallback>
                           {candidate.first_name?.[0] || 'U'}
                           {candidate.last_name?.[0] || 'U'}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <CardTitle className="text-lg">
-                          {candidate.first_name || 'Unknown'} {candidate.last_name || 'User'}
-                        </CardTitle>
-                        <CardDescription>{candidate.email || 'No email provided'}</CardDescription>
+                        <div className="flex items-center gap-2">
+                          <CardTitle className={`text-lg ${!candidate.is_active ? 'text-gray-500' : ''}`}>
+                            {candidate.first_name || 'Unknown'} {candidate.last_name || 'User'}
+                          </CardTitle>
+                          {!candidate.is_active && (
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-xs">
+                              Deactivated
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription className={!candidate.is_active ? 'text-gray-400' : ''}>
+                          {candidate.email || 'No email provided'}
+                        </CardDescription>
                       </div>
                     </div>
                     <DropdownMenu>
@@ -359,19 +406,28 @@ export default function CandidatesPage() {
                             View Details
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/candidates/${candidate.id}/edit`}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Profile
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setDeactivateCandidate(candidate)} className="text-orange-600">
-                          <UserX className="w-4 h-4 mr-2" />
-                          Deactivate
-                        </DropdownMenuItem>
+                        {candidate.is_active && (
+                          <DropdownMenuItem asChild>
+                            <Link href={`/candidates/${candidate.id}/edit`}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Profile
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                        {candidate.is_active ? (
+                          <DropdownMenuItem onClick={() => setDeactivateCandidate(candidate)} className="text-orange-600">
+                            <UserX className="w-4 h-4 mr-2" />
+                            Deactivate
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => setActivateCandidate(candidate)} className="text-green-600">
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Reactivate
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => setDeleteCandidate(candidate)} className="text-red-600">
                           <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
+                          {candidate.is_active ? 'Delete' : 'Permanently Delete'}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -477,14 +533,41 @@ export default function CandidatesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Activate Confirmation Dialog */}
+      <AlertDialog open={!!activateCandidate} onOpenChange={() => setActivateCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reactivate Candidate</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reactivate {activateCandidate?.first_name} {activateCandidate?.last_name}?
+              This will make them visible in active searches again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => activateCandidate && handleActivate(activateCandidate)}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Reactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteCandidate} onOpenChange={() => setDeleteCandidate(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Candidate</AlertDialogTitle>
+            <AlertDialogTitle>Permanently Delete Candidate</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to permanently delete {deleteCandidate?.first_name} {deleteCandidate?.last_name}?
-              This action cannot be undone and will remove all their data.
+              This action cannot be undone and will remove all their data from the system completely.
+              {deleteCandidate?.is_active && (
+                <span className="block mt-2 text-orange-600 font-medium">
+                  Note: This candidate is still active. Consider deactivating them first if you want to preserve their data.
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

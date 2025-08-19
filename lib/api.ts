@@ -395,6 +395,12 @@ class ApiClient {
     })
   }
 
+  async hardDeleteCandidate(id: number) {
+    return this.request<ApiResponse>(`/candidates/${id}/hard-delete`, {
+      method: "DELETE",
+    })
+  }
+
   // Semantic search methods
   async semanticSearch(query: string, options: SearchOptions = {}) {
     return this.request<{
