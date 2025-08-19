@@ -332,8 +332,7 @@ export default function CreateCandidatePage() {
     
     licensesCertifications.forEach((cert, index) => {
       if (!cert.license_certification_name?.trim()) errors.push(`Certification ${index + 1}: Name is required`)
-      if (!cert.issuing_organisation?.trim()) errors.push(`Certification ${index + 1}: Issuing Organization is required`)
-      if (!cert.issue_date?.trim()) errors.push(`Certification ${index + 1}: Issue date is required`)
+      // Issuing Organization and Issue Date are now optional
     })
     
     languages.forEach((lang, index) => {
@@ -371,8 +370,7 @@ export default function CreateCandidatePage() {
     
     currentLicensesCertifications.forEach((cert, index) => {
       if (!cert.license_certification_name?.trim()) errors.push(`Certification ${index + 1}: Name is required`)
-      if (!cert.issuing_organisation?.trim()) errors.push(`Certification ${index + 1}: Issuing Organization is required`)
-      if (!cert.issue_date?.trim()) errors.push(`Certification ${index + 1}: Issue date is required`)
+      // Issuing Organization and Issue Date are now optional
     })
     
     return errors

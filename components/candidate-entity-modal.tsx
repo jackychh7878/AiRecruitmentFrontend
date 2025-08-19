@@ -105,8 +105,7 @@ export function CandidateEntityModal({
         
       case 'certification':
         if (!formData.license_certification_name?.trim()) errors.push("Certification name is required")
-        if (!formData.issuing_organisation?.trim()) errors.push("Issuing Organization is required")
-        if (!formData.issue_date?.trim()) errors.push("Issue date is required")
+        // Issuing Organization and Issue Date are now optional
         break
         
       case 'language':
@@ -316,7 +315,7 @@ export function CandidateEntityModal({
               />
             </div>
             <div>
-              <RequiredLabel htmlFor="issuing_organisation">Issuing Organization</RequiredLabel>
+                              <Label htmlFor="issuing_organisation">Issuing Organization</Label>
               <Input
                 id="issuing_organisation"
                 value={formData.issuing_organisation || ""}
@@ -326,7 +325,7 @@ export function CandidateEntityModal({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <RequiredLabel htmlFor="issue_date">Issue Date</RequiredLabel>
+                <Label htmlFor="issue_date">Issue Date</Label>
                 <Input
                   id="issue_date"
                   type="date"
