@@ -644,27 +644,19 @@ export default function EditCandidatePage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Temporarily commented out Sub-classification field */}
-                {/* <div>
-                  <Label htmlFor="sub_classification_of_interest">Sub-classification</Label>
-                  <Select
-                    value={formData.sub_classification_of_interest || "not-specified"}
-                    onValueChange={(value) => handleInputChange("sub_classification_of_interest", value === "not-specified" ? "" : value)}
-                    disabled={subClassificationLoading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select sub-classification" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="not-specified">-- Not specified --</SelectItem>
-                      {subClassificationCodes.map((code) => (
-                        <SelectItem key={code.id} value={code.com_code}>
-                          {code.com_code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div> */}
+                <div>
+                  <Label htmlFor="sub_classification_of_interest">Role Tags</Label>
+                  <Input
+                    id="sub_classification_of_interest"
+                    type="text"
+                    placeholder="e.g., Developers, Programmers, Full Stack Engineers..."
+                    value={formData.sub_classification_of_interest || ""}
+                    onChange={(e) => handleInputChange("sub_classification_of_interest", e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter role tags separated by commas. These help categorize the candidate's preferred roles.
+                  </p>
+                </div>
                 <div>
                   <Label htmlFor="citizenship">Citizenship / Work Status</Label>
                   <Select

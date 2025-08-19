@@ -158,8 +158,15 @@ export function CandidateHoverCard({ candidateId, children, onViewFullProfile }:
                       </Badge>
                     )}
                     {candidate.sub_classification_of_interest && (
-                      <Badge variant="outline" className="text-xs">
-                        {candidate.sub_classification_of_interest}
+                      candidate.sub_classification_of_interest.split(',').slice(0, 3).map((tag, index) => (
+                        <Badge key={index} variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                          {tag.trim()}
+                        </Badge>
+                      ))
+                    )}
+                    {candidate.sub_classification_of_interest && candidate.sub_classification_of_interest.split(',').length > 3 && (
+                      <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600">
+                        +{candidate.sub_classification_of_interest.split(',').length - 3}
                       </Badge>
                     )}
                   </div>

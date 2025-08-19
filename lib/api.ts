@@ -338,12 +338,18 @@ class ApiClient {
     page?: number
     per_page?: number
     include_relationships?: boolean
+    is_active?: boolean
+    search?: string
+    location?: string
     citizenship?: string
   }) {
     const searchParams = new URLSearchParams()
     if (params?.page) searchParams.set("page", params.page.toString())
     if (params?.per_page) searchParams.set("per_page", params.per_page.toString())
     if (params?.include_relationships) searchParams.set("include_relationships", "true")
+    if (params?.is_active !== undefined) searchParams.set("is_active", params.is_active.toString())
+    if (params?.search) searchParams.set("search", params.search)
+    if (params?.location) searchParams.set("location", params.location)
     if (params?.citizenship) searchParams.set("citizenship", params.citizenship)
 
     const query = searchParams.toString()

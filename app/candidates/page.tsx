@@ -80,6 +80,8 @@ export default function CandidatesPage() {
         page,
         per_page: perPage,
         include_relationships: true,
+        is_active: showDeactivated ? undefined : true,
+        search: searchQuery || undefined,
         citizenship: citizenshipFilter || undefined,
       })
       
@@ -138,7 +140,18 @@ export default function CandidatesPage() {
 
   useEffect(() => {
     loadCandidates()
-  }, [citizenshipFilter])
+  }, [citizenshipFilter, showDeactivated])
+
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery !== undefined) { // Only search when searchQuery is set (including empty string)
+        loadCandidates(1, pagination?.per_page || 20) // Reset to page 1 when searching
+      }
+    }, 500) // 500ms debounce
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery])
 
   const handlePageChange = (newPage: number) => {
     if (pagination && newPage >= 1 && newPage <= pagination.pages && !loading) {
@@ -208,18 +221,8 @@ export default function CandidatesPage() {
     }
   }
 
-  const filteredCandidates = candidates.filter((candidate) => {
-    const matchesSearch = searchQuery === "" || 
-      `${candidate.first_name || ''} ${candidate.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (candidate.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (candidate.classification_of_interest || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (candidate.citizenship || '').toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesCitizenship = citizenshipFilter === "" || candidate.citizenship === citizenshipFilter
-    const matchesActiveStatus = showDeactivated || candidate.is_active
-    
-    return matchesSearch && matchesCitizenship && matchesActiveStatus
-  })
+  // Server-side filtering is now handled by the API, so we use candidates directly
+  const filteredCandidates = candidates
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -263,7 +266,7 @@ export default function CandidatesPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
-            placeholder="Search candidates by name, email, classification, or citizenship..."
+            placeholder="Search candidates by name, email, classification, or sub-classification tags..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -439,7 +442,18 @@ export default function CandidatesPage() {
                       {candidate.classification_of_interest && (
                         <Badge variant="secondary">{candidate.classification_of_interest}</Badge>
                       )}
-                      {candidate.location && <Badge variant="outline">{candidate.location}</Badge>}
+                      {candidate.sub_classification_of_interest && (
+                        candidate.sub_classification_of_interest.split(',').slice(0, 2).map((tag, index) => (
+                          <Badge key={index} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                            {tag.trim()}
+                          </Badge>
+                        ))
+                      )}
+                      {candidate.sub_classification_of_interest && candidate.sub_classification_of_interest.split(',').length > 2 && (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-600">
+                          +{candidate.sub_classification_of_interest.split(',').length - 2} more tags
+                        </Badge>
+                      )}
                       {candidate.citizenship && (
                         <Badge variant="default" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
                           {candidate.citizenship}
@@ -466,7 +480,7 @@ export default function CandidatesPage() {
                     <div className="flex justify-between items-center text-xs text-gray-500">
                       <span>{candidate.salary_expectation && `$${candidate.salary_expectation.toLocaleString()}`}</span>
                       <span>
-                        {candidate.availability_weeks && `Available in ${candidate.availability_weeks} weeks`}
+                        {(candidate.availability_weeks && candidate.availability_weeks > 0) && `Available in ${candidate.availability_weeks} weeks`}
                       </span>
                     </div>
                   </div>

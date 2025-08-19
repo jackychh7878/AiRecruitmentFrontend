@@ -236,15 +236,18 @@ export default function CandidateDetailsPage() {
                   <Badge className="ml-2">{candidate.classification_of_interest}</Badge>
                 </div>
               )}
-              {/* Temporarily commented out Sub-classification display */}
-              {/* {candidate.sub_classification_of_interest && (
+              {candidate.sub_classification_of_interest && (
                 <div>
-                  <Label className="text-sm font-medium text-gray-500">Secondary</Label>
-                  <Badge variant="outline" className="ml-2">
-                    {candidate.sub_classification_of_interest}
-                  </Badge>
+                  <Label className="text-sm font-medium text-gray-500">Role Tags</Label>
+                  <div className="mt-1">
+                    {candidate.sub_classification_of_interest.split(",").map((tag, index) => (
+                      <Badge key={index} variant="outline" className="mr-1 mb-1 bg-purple-50 text-purple-700 border-purple-200">
+                        {tag.trim()}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              )} */}
+              )}
               {candidate.preferred_work_types && (
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Work Preferences</Label>

@@ -192,11 +192,17 @@ export function CandidateProfileModal({ candidateId, isOpen, onClose }: Candidat
                     <Badge variant="secondary">{candidate.classification_of_interest}</Badge>
                   )}
                   {candidate.sub_classification_of_interest && (
-                    <Badge variant="outline">{candidate.sub_classification_of_interest}</Badge>
+                    candidate.sub_classification_of_interest.split(',').map((tag, index) => (
+                      <Badge key={index} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                        {tag.trim()}
+                      </Badge>
+                    ))
                   )}
                   {candidate.preferred_work_types && (
                     candidate.preferred_work_types.split(',').map((type, index) => (
-                      <Badge key={index} variant="outline">{type.trim()}</Badge>
+                      <Badge key={`work-${index}`} variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        {type.trim()}
+                      </Badge>
                     ))
                   )}
                 </div>
