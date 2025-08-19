@@ -10,7 +10,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useRuntimeConfig } from "@/hooks/use-runtime-config"
-import { api, updateApiConfig, type SemanticSearchResult, type ChatbotMessage, type ChatbotResponse } from "@/lib/api"
+import { useApi } from "@/hooks/use-api"
+import { type SemanticSearchResult, type ChatbotMessage, type ChatbotResponse } from "@/lib/api"
 import { generateSessionId, formatChatbotResponse } from "@/lib/utils"
 import { CandidateHoverCard } from "@/components/candidate-hover-card"
 import { CandidateProfileModal } from "@/components/candidate-profile-modal"
@@ -41,6 +42,7 @@ interface ChatbotInterfaceProps {
 
 export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
   const { config, loading: configLoading } = useRuntimeConfig()
+  const api = useApi()
   const [sessionId, setSessionId] = useState<string>("")
   const [isInitialized, setIsInitialized] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -92,16 +94,7 @@ export function ChatbotInterface({ className = "" }: ChatbotInterfaceProps) {
     }
   }, [isInitialized])
 
-  // Update API client when config changes
-  useEffect(() => {
-    if (config.apiUrl) {
-      updateApiConfig(config.apiUrl, config.apiTimeout)
-      console.log('API client updated with runtime config:', {
-        apiUrl: config.apiUrl,
-        apiTimeout: config.apiTimeout
-      })
-    }
-  }, [config.apiUrl, config.apiTimeout])
+  // Note: API client configuration is now handled by ConfigProvider automatically
 
   useEffect(() => {
     // Only scroll when:

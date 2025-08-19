@@ -18,24 +18,41 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [configVersion, setConfigVersion] = useState(0);
 
   useEffect(() => {
-    if (config && !loading) {
+    if (config && !loading && config.apiUrl) {
       console.log('🔄 ConfigProvider: Updating API configuration...', {
         oldConfig: getApiConfig(),
-        newConfig: { apiUrl: config.apiUrl, timeout: config.apiTimeout }
+        newConfig: { apiUrl: config.apiUrl, timeout: config.apiTimeout },
+        configLoading: loading,
+        hasApiUrl: !!config.apiUrl,
+        isLocalhost: config.apiUrl.includes('localhost')
       });
       
-      // Update API configuration with runtime values
-      updateApiConfig(config.apiUrl, config.apiTimeout);
-      
-      // Increment version to force re-renders
-      setConfigVersion(prev => prev + 1);
+      // Only update if we have a valid API URL
+      if (config.apiUrl && config.apiUrl.trim() !== '') {
+        // Update API configuration with runtime values
+        updateApiConfig(config.apiUrl, config.apiTimeout);
+        
+        // Increment version to force re-renders
+        setConfigVersion(prev => prev + 1);
+        
+        console.log('✅ ConfigProvider: API configuration updated. New config:', getApiConfig());
+        
+        // Double-check the update was applied
+        const newConfig = getApiConfig();
+        if (newConfig.baseUrl !== config.apiUrl) {
+          console.error('❌ ConfigProvider: API config update failed!', {
+            expected: config.apiUrl,
+            actual: newConfig.baseUrl
+          });
+        }
+      } else {
+        console.warn('⚠️ ConfigProvider: Invalid API URL, skipping update:', config.apiUrl);
+      }
       
       // Log configuration for debugging
       if (config.debug) {
         console.log('✅ Runtime configuration loaded:', config);
       }
-      
-      console.log('✅ ConfigProvider: API configuration updated. New config:', getApiConfig());
     }
   }, [config, loading]);
 

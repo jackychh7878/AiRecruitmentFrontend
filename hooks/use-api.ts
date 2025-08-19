@@ -16,8 +16,18 @@ export function useApi() {
       configLoading: loading,
       apiUrl: config?.apiUrl,
       clientBaseUrl: apiClient.baseUrl,
+      urlsMatch: config?.apiUrl === apiClient.baseUrl,
       timestamp: new Date().toISOString()
     });
+    
+    // If the URLs don't match and config is loaded, there might be a timing issue
+    if (config?.apiUrl && !loading && config.apiUrl !== apiClient.baseUrl) {
+      console.warn('⚠️ useApi: URL mismatch detected, this might indicate a race condition', {
+        expectedUrl: config.apiUrl,
+        actualUrl: apiClient.baseUrl
+      });
+    }
+    
     return apiClient;
   }, [configVersion, config?.apiUrl, loading]);
 } 

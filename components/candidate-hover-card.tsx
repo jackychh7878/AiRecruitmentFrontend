@@ -63,6 +63,7 @@ export function CandidateHoverCard({ candidateId, children, onViewFullProfile }:
       <HoverCardTrigger 
         asChild 
         onMouseEnter={fetchCandidateProfile}
+        onClick={fetchCandidateProfile}
       >
         {children}
       </HoverCardTrigger>

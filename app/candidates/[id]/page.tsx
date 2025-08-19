@@ -69,12 +69,15 @@ export default function CandidateDetailsPage() {
         
         // Double-check that the API client has the correct URL
         if (api.baseUrl.includes('localhost')) {
-          console.error('❌ API client still has localhost URL:', api.baseUrl)
-          toast({
-            title: "Configuration Error",
-            description: "API client not properly configured. Please refresh the page.",
-            variant: "destructive",
+          console.error('❌ API client still has localhost URL:', {
+            apiClientUrl: api.baseUrl,
+            configUrl: config?.apiUrl,
+            configLoading,
+            timestamp: new Date().toISOString()
           })
+          
+          // Don't show error toast, just wait for config to load properly
+          console.log('🔄 Waiting for API configuration to complete...')
           return
         }
         
@@ -93,10 +96,10 @@ export default function CandidateDetailsPage() {
       }
     }
 
-    if (candidateId && !configLoading && config?.apiUrl && !config.apiUrl.includes('localhost')) {
+    if (candidateId && !configLoading && config?.apiUrl && !config.apiUrl.includes('localhost') && !api.baseUrl.includes('localhost')) {
       loadCandidate()
     }
-  }, [candidateId, router, toast, api, configLoading, config])
+  }, [candidateId, router, toast, api, api.baseUrl, configLoading, config])
 
   const handleDownloadResume = async (resumeId: number, fileName: string) => {
     try {
