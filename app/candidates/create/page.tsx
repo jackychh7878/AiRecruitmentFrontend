@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -39,8 +39,10 @@ export default function CreateCandidatePage() {
   const [confidenceScore, setConfidenceScore] = useState<number>(0)
   const [formData, setFormData] = useState<Partial<CandidateProfile>>({})
   const [loading, setLoading] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch lookup codes dynamically
   const { codes: citizenshipCodes, loading: citizenshipLoading } = useCitizenshipCodes()
@@ -82,6 +84,38 @@ export default function CreateCandidatePage() {
     }
   }, [languages, licensesCertifications, skills, education, careerHistory, step])
 
+  // Prevent default drag behavior for the entire page
+  useEffect(() => {
+    const preventDefaults = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+
+    const handlePageDragEnter = (e: DragEvent) => {
+      preventDefaults(e)
+    }
+
+    const handlePageDragOver = (e: DragEvent) => {
+      preventDefaults(e)
+    }
+
+    const handlePageDrop = (e: DragEvent) => {
+      preventDefaults(e)
+    }
+
+    // Add event listeners
+    document.addEventListener('dragenter', handlePageDragEnter)
+    document.addEventListener('dragover', handlePageDragOver)
+    document.addEventListener('drop', handlePageDrop)
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('dragenter', handlePageDragEnter)
+      document.removeEventListener('dragover', handlePageDragOver)
+      document.removeEventListener('drop', handlePageDrop)
+    }
+  }, [])
+
   // Helper to set step
   const setStepWithDebug = (newStep: CreationStep) => {
     setStep(newStep)
@@ -89,15 +123,44 @@ export default function CreateCandidatePage() {
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
+    processSelectedFile(file)
+  }
+
+  const processSelectedFile = (file: File | undefined) => {
     if (file && file.type === "application/pdf") {
       setSelectedFile(file)
-    } else {
+    } else if (file) {
       toast({
         title: "Invalid file type",
         description: "Please select a PDF file",
         variant: "destructive",
       })
     }
+  }
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true)
+    } else if (e.type === "dragleave") {
+      setDragActive(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0]
+      processSelectedFile(file)
+    }
+  }
+
+  const handleClickUpload = () => {
+    fileInputRef.current?.click()
   }
 
   const handleParseResume = async () => {
@@ -521,11 +584,42 @@ export default function CreateCandidatePage() {
             <CardDescription>Select a PDF resume to automatically extract candidate information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">Upload PDF Resume</h3>
-              <p className="text-gray-600 mb-4">Drag and drop or click to select</p>
-              <Input type="file" accept=".pdf" onChange={handleFileSelect} className="max-w-xs mx-auto" />
+            <div
+              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                dragActive 
+                  ? 'border-blue-500 bg-blue-50 border-solid' 
+                  : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+              }`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              onClick={handleClickUpload}
+            >
+              <Upload className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-blue-500' : 'text-gray-400'}`} />
+              <h3 className="text-lg font-medium mb-2">
+                {dragActive ? 'Drop PDF here' : 'Upload PDF Resume'}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {dragActive ? 'Release to upload' : 'Drag and drop or click to select'}
+              </p>
+              <Input
+                type="file"
+                accept=".pdf"
+                onChange={handleFileSelect}
+                ref={fileInputRef}
+                className="hidden"
+              />
+              <Button 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleClickUpload()
+                }} 
+                className="max-w-xs mx-auto"
+                variant={dragActive ? "default" : "outline"}
+              >
+                Select File
+              </Button>
             </div>
 
             {selectedFile && (
