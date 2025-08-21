@@ -111,6 +111,7 @@ export interface CandidateProfile {
   id: number
   first_name: string
   last_name: string
+  chinese_name?: string
   email: string
   location?: string
   phone_number?: string

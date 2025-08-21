@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { api, type CandidateProfile, type CareerHistory, type Skills, type Education, type LicenseCertification, type Language, convertStringToArray, convertArrayToString } from "@/lib/api"
-import { useCitizenshipCodes, useClassificationCodes, /* useSubClassificationCodes, */ usePreferredWorkTypesCodes } from "@/hooks/use-lookup-codes"
+import { useCitizenshipCodes, useClassificationCodes, useSubClassificationCodes, usePreferredWorkTypesCodes } from "@/hooks/use-lookup-codes"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MultiSelect } from "@/components/ui/multi-select"
@@ -53,16 +53,16 @@ export default function EditCandidatePage() {
   // Fetch lookup codes dynamically
   const { codes: citizenshipCodes, loading: citizenshipLoading } = useCitizenshipCodes()
   const { codes: classificationCodes, loading: classificationLoading } = useClassificationCodes()
-  // const { codes: subClassificationCodes, loading: subClassificationLoading } = useSubClassificationCodes()
+  const { codes: subClassificationCodes, loading: subClassificationLoading } = useSubClassificationCodes()
   const { codes: workTypesCodes, loading: workTypesLoading } = usePreferredWorkTypesCodes()
 
   // Convert work types for multi-select
   const selectedWorkTypes = convertStringToArray(formData.preferred_work_types)
   const workTypesOptions = workTypesCodes.map(code => ({ value: code.com_code, label: code.com_code }))
 
-  // Convert role tags for multi-select (free-form tags)
+  // Convert role tags for multi-select (with predefined options from com codes + allow free-form)
   const selectedRoleTags = convertStringToArray(formData.sub_classification_of_interest)
-  const roleTagsOptions: { value: string; label: string }[] = [] // No predefined options, allow free-form input
+  const roleTagsOptions = subClassificationCodes.map(code => ({ value: code.com_code, label: code.com_code }))
 
   // State for nested entities
   const [careerHistory, setCareerHistory] = useState<CareerHistory[]>([])
@@ -594,6 +594,14 @@ export default function EditCandidatePage() {
                   />
                 </div>
                 <div>
+                  <Label htmlFor="chinese_name">Chinese Name</Label>
+                  <Input
+                    id="chinese_name"
+                    value={formData.chinese_name || ""}
+                    onChange={(e) => handleInputChange("chinese_name", e.target.value)}
+                  />
+                </div>
+                <div>
                   <Label htmlFor="email">Email *</Label>
                   <Input
                     id="email"
@@ -659,10 +667,11 @@ export default function EditCandidatePage() {
                     options={roleTagsOptions}
                     value={selectedRoleTags}
                     onChange={handleRoleTagsChange}
-                    placeholder="Type and press Enter to add role tags..."
+                    placeholder="Select from list or type custom tags..."
+                    disabled={subClassificationLoading}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Type custom role tags and press Enter to add them. These help categorize the candidate's preferred roles.
+                    Select from predefined role categories or type custom role tags and press Enter to add them.
                   </p>
                 </div>
                 <div>

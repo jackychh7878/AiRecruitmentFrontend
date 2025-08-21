@@ -141,6 +141,11 @@ export function CandidateProfileModal({ candidateId, isOpen, onClose }: Candidat
                       <CardTitle className="text-xl">
                         {candidate.first_name} {candidate.last_name}
                       </CardTitle>
+                      {candidate.chinese_name && (
+                        <div className="text-lg text-gray-600 font-medium mt-1">
+                          {candidate.chinese_name}
+                        </div>
+                      )}
                                              <div className="flex flex-wrap gap-6 text-base text-gray-600 mt-3">
                         {candidate.email && (
                           <div className="flex items-center">

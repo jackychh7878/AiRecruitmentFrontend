@@ -188,6 +188,11 @@ export default function CandidateDetailsPage() {
               <CardTitle className="text-xl">
                 {candidate.first_name} {candidate.last_name}
               </CardTitle>
+              {candidate.chinese_name && (
+                <div className="text-lg text-gray-600 font-medium">
+                  {candidate.chinese_name}
+                </div>
+              )}
               <CardDescription>{candidate.email}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

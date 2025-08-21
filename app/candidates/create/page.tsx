@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { api, type CandidateProfile, type CareerHistory, type Skills, type Education, type LicenseCertification, type Language, convertStringToArray, convertArrayToString } from "@/lib/api"
-import { useCitizenshipCodes, useClassificationCodes, usePreferredWorkTypesCodes } from "@/hooks/use-lookup-codes"
+import { useCitizenshipCodes, useClassificationCodes, usePreferredWorkTypesCodes, useSubClassificationCodes } from "@/hooks/use-lookup-codes"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { CandidateEntityModal } from "@/components/candidate-entity-modal"
@@ -48,14 +48,15 @@ export default function CreateCandidatePage() {
   const { codes: citizenshipCodes, loading: citizenshipLoading } = useCitizenshipCodes()
   const { codes: classificationCodes, loading: classificationLoading } = useClassificationCodes()
   const { codes: workTypesCodes, loading: workTypesLoading } = usePreferredWorkTypesCodes()
+  const { codes: subClassificationCodes, loading: subClassificationLoading } = useSubClassificationCodes()
 
   // Convert work types for multi-select
   const selectedWorkTypes = convertStringToArray(formData.preferred_work_types)
   const workTypesOptions = workTypesCodes.map(code => ({ value: code.com_code, label: code.com_code }))
 
-  // Convert role tags for multi-select (free-form tags)
+  // Convert role tags for multi-select (with predefined options from com codes + allow free-form)
   const selectedRoleTags = convertStringToArray(formData.sub_classification_of_interest)
-  const roleTagsOptions: { value: string; label: string }[] = [] // No predefined options, allow free-form input
+  const roleTagsOptions = subClassificationCodes.map(code => ({ value: code.com_code, label: code.com_code }))
 
   // State for nested entities (separate from formData for better control)
   const [careerHistory, setCareerHistory] = useState<CareerHistory[]>([])
@@ -781,6 +782,14 @@ export default function CreateCandidatePage() {
                       />
                     </div>
                     <div>
+                      <Label htmlFor="chinese_name">Chinese Name</Label>
+                      <Input
+                        id="chinese_name"
+                        value={formData.chinese_name || ""}
+                        onChange={(e) => handleFormChange("chinese_name", e.target.value)}
+                      />
+                    </div>
+                    <div>
                       <RequiredLabel htmlFor="email">Email</RequiredLabel>
                       <Input
                         id="email"
@@ -841,10 +850,11 @@ export default function CreateCandidatePage() {
                         options={roleTagsOptions}
                         value={selectedRoleTags}
                         onChange={handleRoleTagsChange}
-                        placeholder="Type and press Enter to add role tags..."
+                        placeholder="Select from list or type custom tags..."
+                        disabled={subClassificationLoading}
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Type custom role tags and press Enter to add them. These help categorize the candidate's preferred roles.
+                        Select from predefined role categories or type custom role tags and press Enter to add them.
                       </p>
                     </div>
                     <div>

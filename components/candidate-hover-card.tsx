@@ -104,6 +104,11 @@ export function CandidateHoverCard({ candidateId, children, onViewFullProfile }:
                       <CardTitle className="text-base font-semibold">
                         {candidate.first_name} {candidate.last_name}
                       </CardTitle>
+                      {candidate.chinese_name && (
+                        <div className="text-sm text-gray-600 font-medium">
+                          {candidate.chinese_name}
+                        </div>
+                      )}
                       <div className="flex flex-col gap-1 text-xs text-gray-600 mt-1">
                         {candidate.email && (
                           <div className="flex items-center">

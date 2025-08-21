@@ -391,6 +391,11 @@ export default function CandidatesPage() {
                             </Badge>
                           )}
                         </div>
+                        {candidate.chinese_name && (
+                          <div className={`text-sm ${!candidate.is_active ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {candidate.chinese_name}
+                          </div>
+                        )}
                         <CardDescription className={!candidate.is_active ? 'text-gray-400' : ''}>
                           {candidate.email || 'No email provided'}
                         </CardDescription>
