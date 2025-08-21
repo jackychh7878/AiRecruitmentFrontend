@@ -1224,6 +1224,111 @@ class ApiClient {
     }>("/candidates/batch-parse-resumes/jobs")
   }
 
+  async getBatchJobHistory(params?: {
+    status?: string
+    per_page?: number
+    page?: number
+  }) {
+    const searchParams = new URLSearchParams()
+    if (params?.status) searchParams.append('status', params.status)
+    if (params?.per_page) searchParams.append('per_page', params.per_page.toString())
+    if (params?.page) searchParams.append('page', params.page.toString())
+    
+    const query = searchParams.toString()
+    const url = `/candidates/batch-parse-resumes/history${query ? `?${query}` : ''}`
+    
+    return this.request<{
+      jobs: Array<{
+        id: number
+        job_id: string
+        batch_number: string
+        batch_upload_datetime: string
+        status: string
+        created_at: string
+        started_at?: string
+        completed_at?: string
+        total_files: number
+        processed_files: number
+        successful_profiles: number
+        completed_profiles: number
+        incomplete_profiles: number
+        failed_files: number
+        ai_summaries_generated: number
+        ai_summaries_failed: number
+        classifications_generated: number
+        classifications_failed: number
+        progress_percentage: number
+        processing_time_seconds: number
+        created_by: string
+        last_modified_date: string
+      }>
+      pagination: {
+        page: number
+        per_page: number
+        total: number
+        pages: number
+        has_next: boolean
+        has_prev: boolean
+      }
+      filters: {
+        status: string | null
+        created_by: string | null
+      }
+    }>(url)
+  }
+
+  async getBatchJobFailedFiles(jobId: string) {
+    return this.request<{
+      job_id: string
+      batch_number: string
+      total_failed_files: number
+      failed_files: Array<{
+        id: number
+        batch_job_id: number
+        original_filename: string
+        file_size: number
+        failure_reason: string
+        error_type: string
+        failure_stage: string
+        parsing_method: string
+        attempted_at: string
+        created_date: string
+      }>
+    }>(`/candidates/batch-parse-resumes/${jobId}/failed-files`)
+  }
+
+  async getBatchStatistics() {
+    return this.request<{
+      job_statistics: {
+        total_jobs: number
+        completed_jobs: number
+        failed_jobs: number
+        processing_jobs: number
+        queued_jobs: number
+        cancelled_jobs: number
+        job_success_rate_percentage: number
+        recent_jobs_24h: number
+      }
+      file_processing_statistics: {
+        total_files_processed: number
+        total_successful_profiles: number
+        total_failed_files: number
+        total_completed_profiles: number
+        total_incomplete_profiles: number
+        file_success_rate_percentage: number
+        profile_completion_rate_percentage: number
+      }
+      ai_processing_statistics: {
+        ai_summaries_generated: number
+        ai_summaries_failed: number
+        ai_summary_success_rate_percentage: number
+        classifications_generated: number
+        classifications_failed: number
+        classification_success_rate_percentage: number
+      }
+    }>("/candidates/batch-parse-resumes/statistics")
+  }
+
   async getBatchJobStatus(jobId: string) {
     return this.request<BatchJobStatus>(`/candidates/batch-parse-resumes/${jobId}/status`)
   }

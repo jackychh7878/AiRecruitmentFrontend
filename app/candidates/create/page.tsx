@@ -19,6 +19,7 @@ import { api, type CandidateProfile, type CareerHistory, type Skills, type Educa
 import { useCitizenshipCodes, useClassificationCodes, usePreferredWorkTypesCodes, useSubClassificationCodes } from "@/hooks/use-lookup-codes"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { CandidateEntityModal } from "@/components/candidate-entity-modal"
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, User, Briefcase, Award, GraduationCap, Languages as LanguagesIcon, Plus, Edit, Trash2, Users, Eye, X } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
@@ -54,7 +55,28 @@ export default function CreateCandidatePage() {
   const [batchJobId, setBatchJobId] = useState<string | null>(null)
   const [batchJobStatus, setBatchJobStatus] = useState<any>(null)
   const [batchLoading, setBatchLoading] = useState(false)
-  const [batchJobs, setBatchJobs] = useState<any[]>([])
+  
+  // Job history state (replaces batchJobs)
+  const [jobHistory, setJobHistory] = useState<any[]>([])
+  const [historyPagination, setHistoryPagination] = useState<any>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<string>("")
+  const [currentPage, setCurrentPage] = useState(1)
+  
+  // Failed files modal state
+  const [failedFilesModal, setFailedFilesModal] = useState<{
+    isOpen: boolean
+    jobId: string | null
+    data: any | null
+  }>({
+    isOpen: false,
+    jobId: null,
+    data: null
+  })
+  
+  // Statistics state
+  const [statistics, setStatistics] = useState<any>(null)
+  const [statisticsLoading, setStatisticsLoading] = useState(false)
   
   const router = useRouter()
   const { toast } = useToast()
@@ -264,169 +286,111 @@ export default function CreateCandidatePage() {
     loadBatchConfig()
   }, [mode, toast])
 
-  // Load active batch jobs
-  useEffect(() => {
-    const loadBatchJobs = async () => {
-      if (mode === "batch") {
-        try {
-          const response = await api.getBatchJobs()
-          setBatchJobs(response.jobs)
-        } catch (error) {
-          console.error("Failed to load batch jobs:", error)
-        }
+  // Load job history
+  const loadJobHistory = async () => {
+    if (mode === "batch") {
+      try {
+        setHistoryLoading(true)
+        const response = await api.getBatchJobHistory({
+          status: statusFilter || undefined,
+          per_page: 10,
+          page: currentPage
+        })
+        setJobHistory(response.jobs)
+        setHistoryPagination(response.pagination)
+      } catch (error) {
+        console.error("Failed to load job history:", error)
+        toast({
+          title: "Failed to load job history",
+          description: "There was an error loading the job history. Please try again.",
+          variant: "destructive"
+        })
+      } finally {
+        setHistoryLoading(false)
       }
     }
-    
-    loadBatchJobs()
-    
-    // Set up polling for batch jobs
-    const interval = setInterval(loadBatchJobs, 5000) // Poll every 5 seconds
-    return () => clearInterval(interval)
+  }
+
+  // Load statistics
+  const loadStatistics = async () => {
+    try {
+      setStatisticsLoading(true)
+      const response = await api.getBatchStatistics()
+      setStatistics(response)
+    } catch (error) {
+      console.error("Failed to load statistics:", error)
+    } finally {
+      setStatisticsLoading(false)
+    }
+  }
+
+  // Load failed files for a job
+  const loadFailedFiles = async (jobId: string) => {
+    try {
+      const response = await api.getBatchJobFailedFiles(jobId)
+      setFailedFilesModal({
+        isOpen: true,
+        jobId,
+        data: response
+      })
+    } catch (error) {
+      console.error("Failed to load failed files:", error)
+      toast({
+        title: "Failed to load failed files",
+        description: "There was an error loading the failed files information.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  useEffect(() => {
+    loadJobHistory()
+  }, [mode, statusFilter, currentPage])
+
+  useEffect(() => {
+    if (mode === "batch") {
+      loadStatistics()
+      
+      // Set up polling for statistics and job history
+      const interval = setInterval(() => {
+        loadJobHistory()
+        loadStatistics()
+      }, 10000) // Poll every 10 seconds
+      
+      return () => clearInterval(interval)
+    }
   }, [mode])
 
-  // Poll for batch job status if we have an active job
+  // Simplified job status tracking - just show immediate feedback and rely on history polling
   useEffect(() => {
     if (batchJobId && mode === "batch") {
-      let pollAttempts = 0
-      const maxPollAttempts = 150 // Stop polling after 5 minutes (150 * 2 seconds)
-      
-      const pollJobStatus = async () => {
-        try {
-          pollAttempts++
-          console.log(`Polling job status for: ${batchJobId}`)
-          const status = await api.getBatchJobStatus(batchJobId)
-          setBatchJobStatus(status)
-          
-          // If job is completed, stop polling immediately and handle completion
-          if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
-            console.log(`Job ${batchJobId} finished with status: ${status.status}`)
-            
-            // Show completion message
-            if (status.status === "completed") {
-              toast({
-                title: "Batch processing completed!",
-                description: `Successfully processed ${status.successful_profiles} out of ${status.total_files} files. ${status.failed_files > 0 ? `${status.failed_files} files failed.` : ''}`,
-                variant: "default"
-              })
-            } else if (status.status === "failed") {
-              toast({
-                title: "Batch processing failed",
-                description: `Processing failed. ${status.errors.length > 0 ? status.errors[0] : 'Unknown error occurred.'}`,
-                variant: "destructive"
-              })
-            }
-            
-            // Try to reload the batch jobs list (may be empty if backend clears completed jobs)
-            try {
-              const response = await api.getBatchJobs()
-              setBatchJobs(response.jobs)
-            } catch (error) {
-              console.error("Failed to reload jobs after completion:", error)
-            }
-            
-            // Clear the current job immediately to stop polling
-            // The completed status is already shown to the user
-            setBatchJobId(null)
-            setBatchJobStatus(null)
-            
-            // Stop polling by returning early
-            return
-          }
-        } catch (error) {
-          // Handle different error types
-          if (error instanceof Error && error.message.includes('not found')) {
-            // Job not found error - could be timing issue OR job completed and was removed
-            // Only log for first few attempts to avoid spam
-            if (pollAttempts <= 5) {
-              console.log(`Job ${batchJobId} not found (attempt ${pollAttempts}) - might be timing issue, continuing...`)
-            }
-            
-            if (pollAttempts <= 5) {
-              // For first few attempts, this might be a timing issue - just wait longer
-              // Don't log anything here to reduce console noise
-            } else {
-              // Check if job completed and was removed from the system
-              try {
-                const response = await api.getBatchJobs()
-                setBatchJobs(response.jobs)
-                
-                // Check if our job exists in the jobs list
-                const foundJob = response.jobs.find(job => job.job_id === batchJobId)
-                if (foundJob) {
-                  // Job still exists, update status
-                  setBatchJobStatus(foundJob)
-                } else {
-                  // Job not in active list - likely completed and removed
-                  // This is expected behavior, so we handle it silently
-                  if (pollAttempts > 10) {
-                    // Job has been missing for a while, assume it completed successfully
-                    // Clear the job tracking silently since this is normal behavior
-                    setBatchJobId(null)
-                    setBatchJobStatus(null)
-                  }
-                }
-              } catch (jobsError) {
-                // Only log this if it's not a simple 404 - those are expected
-                if (!jobsError || !(jobsError as Error).message.includes('not found')) {
-                  console.error("Failed to reload batch jobs:", jobsError)
-                }
-                
-                // If we can't even get the jobs list for a long time, assume job completed
-                if (pollAttempts > 15) {
-                  setBatchJobId(null)
-                  setBatchJobStatus(null)
-                }
-              }
-            }
-          } else if (error instanceof Error && (error.message.includes('404') || error.message.includes('500'))) {
-            // Other 404/500 errors
-            if (pollAttempts > 30) {
-              const errorType = error.message.includes('500') ? 'backend error' : 'not found'
-              toast({
-                title: "Job status unavailable",
-                description: `Unable to get job status (${errorType}). Check the jobs list below for current status.`,
-                variant: "destructive"
-              })
-              setBatchJobId(null)
-              setBatchJobStatus(null)
-            }
-          } else {
-            // Other errors - stop polling after too many attempts
-            if (pollAttempts > 30) {
-              toast({
-                title: "Status check failed",
-                description: "Unable to check job status. Please refresh the page to see current jobs.",
-                variant: "destructive"
-              })
-              setBatchJobId(null)
-              setBatchJobStatus(null)
-            }
-          }
-        }
-        
-        // Stop polling if we've exceeded max attempts
-        if (pollAttempts >= maxPollAttempts) {
-          console.warn("Max polling attempts reached, stopping status checks")
-          setBatchJobId(null)
-          setBatchJobStatus(null)
-        }
-      }
-      
-      // Wait 3 seconds before starting polling to give backend time to register the job
-      console.log(`Starting polling for job ${batchJobId} in 3 seconds...`)
-      let interval: NodeJS.Timeout | null = null
-      
-      const initialTimeout = setTimeout(() => {
-        pollJobStatus()
-        interval = setInterval(pollJobStatus, 2000)
-      }, 3000)
-      
-      return () => {
-        clearTimeout(initialTimeout)
-        if (interval) clearInterval(interval)
-      }
+      // For database-persisted jobs, we just need to show immediate status
+      // and let the history polling handle updates
+      setBatchJobStatus({
+        job_id: batchJobId,
+        status: "processing",
+        created_at: new Date().toISOString(),
+        total_files: selectedFiles.length || 0,
+        processed_files: 0,
+        successful_profiles: 0,
+        failed_files: 0,
+        progress_percentage: 0,
+        processing_time_seconds: 0,
+        errors: [],
+        results: []
+      })
+
+      // Clear the job tracking after a short delay to let history polling take over
+      const timeout = setTimeout(() => {
+        setBatchJobId(null)
+        setBatchJobStatus(null)
+        // Trigger an immediate history refresh
+        loadJobHistory()
+      }, 5000) // Clear after 5 seconds
+
+      return () => clearTimeout(timeout)
     }
-  }, [batchJobId, mode, toast])
+  }, [batchJobId, mode, selectedFiles.length])
 
   // Batch file handlers
   const handleBatchFilesSelect = (files: FileList | File[]) => {
@@ -564,18 +528,11 @@ export default function CreateCandidatePage() {
         // Clear selected files
         setSelectedFiles([])
         
-        // Reload the jobs list to include this new job
+        // Reload job history to include this new job
         try {
-          const jobsResponse = await api.getBatchJobs()
-          setBatchJobs(jobsResponse.jobs)
-          
-          // Verify our job exists in the list
-          const foundJob = jobsResponse.jobs.find(job => job.job_id === response.job_id)
-          if (!foundJob) {
-            console.warn(`Job ${response.job_id} not immediately visible in jobs list`)
-          }
+          loadJobHistory()
         } catch (jobsError) {
-          console.error("Failed to reload jobs after upload:", jobsError)
+          console.error("Failed to reload job history after upload:", jobsError)
         }
       } else {
         throw new Error(response.message || "Batch upload failed")
@@ -608,9 +565,8 @@ export default function CreateCandidatePage() {
         description: `Batch job ${jobId} has been cancelled`
       })
       
-      // Reload jobs
-      const response = await api.getBatchJobs()
-      setBatchJobs(response.jobs)
+      // Reload job history
+      loadJobHistory()
       
       // Clear current job if it's the one we cancelled
       if (batchJobId === jobId) {
@@ -1306,37 +1262,138 @@ export default function CreateCandidatePage() {
             </Card>
           )}
 
-          {/* Active Batch Jobs */}
+          {/* Statistics Dashboard */}
+          {statistics && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Batch Processing Statistics</CardTitle>
+                <CardDescription>
+                  Overview of all batch resume processing activities
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Job Statistics */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-gray-700">Job Performance</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm">Total Jobs:</span>
+                        <span className="font-medium">{statistics.job_statistics.total_jobs}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Success Rate:</span>
+                        <span className="font-medium text-green-600">
+                          {statistics.job_statistics.job_success_rate_percentage.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Recent (24h):</span>
+                        <span className="font-medium">{statistics.job_statistics.recent_jobs_24h}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* File Processing */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-gray-700">File Processing</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm">Files Processed:</span>
+                        <span className="font-medium">{statistics.file_processing_statistics.total_files_processed}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Success Rate:</span>
+                        <span className="font-medium text-green-600">
+                          {statistics.file_processing_statistics.file_success_rate_percentage.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Profiles Created:</span>
+                        <span className="font-medium text-blue-600">{statistics.file_processing_statistics.total_successful_profiles}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI Processing */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-gray-700">AI Processing</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm">Summaries:</span>
+                        <span className="font-medium text-purple-600">{statistics.ai_processing_statistics.ai_summaries_generated}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Classifications:</span>
+                        <span className="font-medium text-purple-600">{statistics.ai_processing_statistics.classifications_generated}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">AI Success:</span>
+                        <span className="font-medium text-green-600">
+                          {statistics.ai_processing_statistics.ai_summary_success_rate_percentage.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Job History */}
           <Card>
             <CardHeader>
-              <CardTitle>Active Batch Jobs</CardTitle>
+              <CardTitle>Batch Job History</CardTitle>
               <CardDescription>
-                {batchJobs.length > 0 
-                  ? "Currently running batch resume processing jobs"
-                  : "No active batch jobs. Completed jobs are automatically removed from this list."
-                }
+                Complete history of batch resume processing jobs
               </CardDescription>
+              {/* Status Filter */}
+              <div className="flex gap-2 mt-4">
+                <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="queued">Queued</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
-              {batchJobs.length > 0 ? (
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-gray-500">Loading job history...</div>
+                </div>
+              ) : jobHistory.length > 0 ? (
                 <>
                   <div className="space-y-3">
-                    {batchJobs.slice(0, 5).map((job) => (
-                      <div key={job.job_id} className="flex items-center justify-between p-3 border rounded-lg">
+                    {jobHistory.map((job) => (
+                      <div key={job.job_id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex-1">
                           <div className="font-medium">{job.batch_number}</div>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-sm text-gray-600 mt-1">
                             {job.total_files} files • {job.successful_profiles} successful • {job.failed_files} failed
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-gray-500 mt-1">
                             {new Date(job.created_at).toLocaleString()}
+                            {job.completed_at && (
+                              <span className="ml-2">
+                                • Completed in {job.processing_time_seconds.toFixed(1)}s
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant={
                             job.status === "completed" ? "default" :
                             job.status === "failed" ? "destructive" :
-                            job.status === "processing" ? "secondary" : "outline"
+                            job.status === "processing" ? "secondary" : 
+                            job.status === "cancelled" ? "outline" : "outline"
                           }>
                             {job.status}
                           </Badge>
@@ -1349,23 +1406,53 @@ export default function CreateCandidatePage() {
                               Cancel
                             </Button>
                           )}
+                          {job.failed_files > 0 && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => loadFailedFiles(job.job_id)}
+                            >
+                              View Errors
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
                   
-                  {batchJobs.length > 5 && (
-                    <div className="text-center mt-4">
-                      <Button variant="outline" onClick={() => router.push("/candidates")}>
-                        View All Jobs
-                      </Button>
+                  {/* Pagination */}
+                  {historyPagination && historyPagination.pages > 1 && (
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="text-sm text-gray-500">
+                        Showing {((historyPagination.page - 1) * historyPagination.per_page) + 1} to{" "}
+                        {Math.min(historyPagination.page * historyPagination.per_page, historyPagination.total)} of{" "}
+                        {historyPagination.total} jobs
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(currentPage - 1)}
+                          disabled={!historyPagination.has_prev}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                          disabled={!historyPagination.has_next}
+                        >
+                          Next
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </>
               ) : (
                 <div className="text-center py-8 text-gray-500">
-                  <p>No active batch jobs at the moment.</p>
-                  <p className="text-sm mt-1">Completed jobs are automatically removed from this list.</p>
+                  <p>No batch jobs found.</p>
+                  <p className="text-sm mt-1">Start your first batch upload to see job history here.</p>
                 </div>
               )}
             </CardContent>
@@ -2046,6 +2133,61 @@ export default function CreateCandidatePage() {
         item={editingItem.item}
         isNew={editingItem.isNew}
       />
+
+      {/* Failed Files Modal */}
+      <Dialog open={failedFilesModal.isOpen} onOpenChange={(open) => setFailedFilesModal(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Failed Files Report</DialogTitle>
+            <DialogDescription>
+              {failedFilesModal.data && (
+                <>
+                  Details for batch job: {failedFilesModal.data.batch_number} 
+                  ({failedFilesModal.data.total_failed_files} failed files)
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {failedFilesModal.data && (
+            <div className="max-h-96 overflow-y-auto">
+              <div className="space-y-4">
+                {failedFilesModal.data.failed_files.map((file: any, index: number) => (
+                  <div key={file.id} className="border rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm">{file.original_filename}</h4>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Size: {(file.file_size / 1024).toFixed(1)} KB • 
+                          Stage: {file.failure_stage} • 
+                          Method: {file.parsing_method} •
+                          Time: {new Date(file.attempted_at).toLocaleString()}
+                        </div>
+                      </div>
+                      <Badge variant="destructive" className="ml-2">
+                        {file.error_type}
+                      </Badge>
+                    </div>
+                    <div className="mt-3">
+                      <h5 className="text-xs font-medium text-gray-700 mb-1">Error Details:</h5>
+                      <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border max-h-24 overflow-y-auto">
+                        {file.failure_reason}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button 
+              variant="outline" 
+              onClick={() => setFailedFilesModal({ isOpen: false, jobId: null, data: null })}
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 
