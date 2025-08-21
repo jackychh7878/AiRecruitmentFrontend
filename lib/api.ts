@@ -210,6 +210,30 @@ export interface Resume {
   last_modified_date: string
 }
 
+export interface BatchJobStatus {
+  job_id: string
+  batch_number: string
+  batch_upload_datetime?: string
+  status: string
+  created_at: string
+  started_at?: string
+  completed_at?: string
+  total_files: number
+  processed_files: number
+  successful_profiles: number
+  completed_profiles: number
+  incomplete_profiles: number
+  failed_files: number
+  ai_summaries_generated: number
+  ai_summaries_failed: number
+  classifications_generated: number
+  classifications_failed: number
+  progress_percentage: number
+  processing_time_seconds: number
+  errors: string[]
+  results: any[]
+}
+
 export interface PromptTemplate {
   id: number
   name: string
@@ -327,7 +351,14 @@ class ApiClient {
           throw new Error('Connection refused: Backend server is not running on the specified port.')
         }
         
-        console.error("API request failed:", error)
+        // Suppress expected 404 errors for batch job status checks (jobs complete and get removed)
+        const isBatchJobNotFound = url.includes('/batch-parse-resumes/') && 
+                                 url.includes('/status') && 
+                                 error.message.includes('not found')
+        
+        if (!isBatchJobNotFound) {
+          console.error("API request failed:", error)
+        }
         throw error
       }
       throw new Error('Unknown error occurred')
@@ -1140,6 +1171,70 @@ class ApiClient {
       }
       throw new Error('Unknown error occurred while sending message to chatbot')
     }
+  }
+
+  // Batch resume parsing APIs
+  async getBatchUploadConfig() {
+    return this.request<{
+      limits: {
+        individual_file_limit_bytes: number
+        individual_file_limit_mb: number
+        batch_upload_limit_bytes: number
+        batch_upload_limit_mb: number
+        flask_max_content_length_bytes: number
+        flask_max_content_length_mb: number
+        max_files_per_batch: number
+      }
+      environment_variables: {
+        MAX_CONTENT_LENGTH: string
+        BATCH_UPLOAD_LIMIT: string
+      }
+      recommendations: {
+        message: string
+        current_effective_limit_mb: number
+      }
+    }>("/candidates/batch-parse-resumes/config")
+  }
+
+  async batchParseResumes(files: File[]) {
+    const formData = new FormData()
+    
+    // Add files to form data
+    files.forEach((file) => {
+      formData.append("resume_files", file)
+    })
+
+    return this.request<{
+      success: boolean
+      message: string
+      job_id: string
+      batch_number: string
+      total_files: number
+    }>("/candidates/batch-parse-resumes", {
+      method: "POST",
+      body: formData,
+      headers: {}, // Remove Content-Type to let browser set it for FormData
+    })
+  }
+
+  async getBatchJobs() {
+    return this.request<{
+      jobs: BatchJobStatus[]
+      total_jobs: number
+    }>("/candidates/batch-parse-resumes/jobs")
+  }
+
+  async getBatchJobStatus(jobId: string) {
+    return this.request<BatchJobStatus>(`/candidates/batch-parse-resumes/${jobId}/status`)
+  }
+
+  async cancelBatchJob(jobId: string) {
+    return this.request<{
+      success: boolean
+      message: string
+    }>(`/candidates/batch-parse-resumes/${jobId}/cancel`, {
+      method: "POST"
+    })
   }
 }
 

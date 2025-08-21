@@ -20,9 +20,12 @@ import { useCitizenshipCodes, useClassificationCodes, usePreferredWorkTypesCodes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MultiSelect } from "@/components/ui/multi-select"
 import { CandidateEntityModal } from "@/components/candidate-entity-modal"
-import { Upload, FileText, Loader2, CheckCircle, AlertCircle, User, Briefcase, Award, GraduationCap, Languages as LanguagesIcon, Plus, Edit, Trash2 } from "lucide-react"
+import { Upload, FileText, Loader2, CheckCircle, AlertCircle, User, Briefcase, Award, GraduationCap, Languages as LanguagesIcon, Plus, Edit, Trash2, Users, Eye, X } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 type CreationStep = "upload" | "parsing" | "review" | "creating" | "finalizing" | "complete"
+type CreationMode = "single" | "batch"
 
 // Component for required field labels with red asterisk
 const RequiredLabel = ({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) => (
@@ -33,6 +36,10 @@ const RequiredLabel = ({ htmlFor, children }: { htmlFor: string; children: React
 )
 
 export default function CreateCandidatePage() {
+  // Mode selection
+  const [mode, setMode] = useState<CreationMode>("single")
+  
+  // Single file mode states
   const [step, setStep] = useState<CreationStep>("upload")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<Partial<CandidateProfile> | null>(null)
@@ -40,9 +47,19 @@ export default function CreateCandidatePage() {
   const [formData, setFormData] = useState<Partial<CandidateProfile>>({})
   const [loading, setLoading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  
+  // Batch mode states
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [batchConfig, setBatchConfig] = useState<any>(null)
+  const [batchJobId, setBatchJobId] = useState<string | null>(null)
+  const [batchJobStatus, setBatchJobStatus] = useState<any>(null)
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [batchJobs, setBatchJobs] = useState<any[]>([])
+  
   const router = useRouter()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const batchFileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch lookup codes dynamically
   const { codes: citizenshipCodes, loading: citizenshipLoading } = useCitizenshipCodes()
@@ -224,6 +241,389 @@ export default function CreateCandidatePage() {
   const handleRoleTagsChange = (values: string[]) => {
     const joinedValues = convertArrayToString(values)
     handleFormChange("sub_classification_of_interest", joinedValues)
+  }
+
+  // Load batch upload configuration
+  useEffect(() => {
+    const loadBatchConfig = async () => {
+      if (mode === "batch") {
+        try {
+          const config = await api.getBatchUploadConfig()
+          setBatchConfig(config)
+        } catch (error) {
+          console.error("Failed to load batch config:", error)
+          toast({
+            title: "Configuration Error",
+            description: "Failed to load batch upload configuration",
+            variant: "destructive"
+          })
+        }
+      }
+    }
+    
+    loadBatchConfig()
+  }, [mode, toast])
+
+  // Load active batch jobs
+  useEffect(() => {
+    const loadBatchJobs = async () => {
+      if (mode === "batch") {
+        try {
+          const response = await api.getBatchJobs()
+          setBatchJobs(response.jobs)
+        } catch (error) {
+          console.error("Failed to load batch jobs:", error)
+        }
+      }
+    }
+    
+    loadBatchJobs()
+    
+    // Set up polling for batch jobs
+    const interval = setInterval(loadBatchJobs, 5000) // Poll every 5 seconds
+    return () => clearInterval(interval)
+  }, [mode])
+
+  // Poll for batch job status if we have an active job
+  useEffect(() => {
+    if (batchJobId && mode === "batch") {
+      let pollAttempts = 0
+      const maxPollAttempts = 150 // Stop polling after 5 minutes (150 * 2 seconds)
+      
+      const pollJobStatus = async () => {
+        try {
+          pollAttempts++
+          console.log(`Polling job status for: ${batchJobId}`)
+          const status = await api.getBatchJobStatus(batchJobId)
+          setBatchJobStatus(status)
+          
+          // If job is completed, stop polling immediately and handle completion
+          if (status.status === "completed" || status.status === "failed" || status.status === "cancelled") {
+            console.log(`Job ${batchJobId} finished with status: ${status.status}`)
+            
+            // Show completion message
+            if (status.status === "completed") {
+              toast({
+                title: "Batch processing completed!",
+                description: `Successfully processed ${status.successful_profiles} out of ${status.total_files} files. ${status.failed_files > 0 ? `${status.failed_files} files failed.` : ''}`,
+                variant: "default"
+              })
+            } else if (status.status === "failed") {
+              toast({
+                title: "Batch processing failed",
+                description: `Processing failed. ${status.errors.length > 0 ? status.errors[0] : 'Unknown error occurred.'}`,
+                variant: "destructive"
+              })
+            }
+            
+            // Try to reload the batch jobs list (may be empty if backend clears completed jobs)
+            try {
+              const response = await api.getBatchJobs()
+              setBatchJobs(response.jobs)
+            } catch (error) {
+              console.error("Failed to reload jobs after completion:", error)
+            }
+            
+            // Clear the current job immediately to stop polling
+            // The completed status is already shown to the user
+            setBatchJobId(null)
+            setBatchJobStatus(null)
+            
+            // Stop polling by returning early
+            return
+          }
+        } catch (error) {
+          // Handle different error types
+          if (error instanceof Error && error.message.includes('not found')) {
+            // Job not found error - could be timing issue OR job completed and was removed
+            // Only log for first few attempts to avoid spam
+            if (pollAttempts <= 5) {
+              console.log(`Job ${batchJobId} not found (attempt ${pollAttempts}) - might be timing issue, continuing...`)
+            }
+            
+            if (pollAttempts <= 5) {
+              // For first few attempts, this might be a timing issue - just wait longer
+              // Don't log anything here to reduce console noise
+            } else {
+              // Check if job completed and was removed from the system
+              try {
+                const response = await api.getBatchJobs()
+                setBatchJobs(response.jobs)
+                
+                // Check if our job exists in the jobs list
+                const foundJob = response.jobs.find(job => job.job_id === batchJobId)
+                if (foundJob) {
+                  // Job still exists, update status
+                  setBatchJobStatus(foundJob)
+                } else {
+                  // Job not in active list - likely completed and removed
+                  // This is expected behavior, so we handle it silently
+                  if (pollAttempts > 10) {
+                    // Job has been missing for a while, assume it completed successfully
+                    // Clear the job tracking silently since this is normal behavior
+                    setBatchJobId(null)
+                    setBatchJobStatus(null)
+                  }
+                }
+              } catch (jobsError) {
+                // Only log this if it's not a simple 404 - those are expected
+                if (!jobsError || !(jobsError as Error).message.includes('not found')) {
+                  console.error("Failed to reload batch jobs:", jobsError)
+                }
+                
+                // If we can't even get the jobs list for a long time, assume job completed
+                if (pollAttempts > 15) {
+                  setBatchJobId(null)
+                  setBatchJobStatus(null)
+                }
+              }
+            }
+          } else if (error instanceof Error && (error.message.includes('404') || error.message.includes('500'))) {
+            // Other 404/500 errors
+            if (pollAttempts > 30) {
+              const errorType = error.message.includes('500') ? 'backend error' : 'not found'
+              toast({
+                title: "Job status unavailable",
+                description: `Unable to get job status (${errorType}). Check the jobs list below for current status.`,
+                variant: "destructive"
+              })
+              setBatchJobId(null)
+              setBatchJobStatus(null)
+            }
+          } else {
+            // Other errors - stop polling after too many attempts
+            if (pollAttempts > 30) {
+              toast({
+                title: "Status check failed",
+                description: "Unable to check job status. Please refresh the page to see current jobs.",
+                variant: "destructive"
+              })
+              setBatchJobId(null)
+              setBatchJobStatus(null)
+            }
+          }
+        }
+        
+        // Stop polling if we've exceeded max attempts
+        if (pollAttempts >= maxPollAttempts) {
+          console.warn("Max polling attempts reached, stopping status checks")
+          setBatchJobId(null)
+          setBatchJobStatus(null)
+        }
+      }
+      
+      // Wait 3 seconds before starting polling to give backend time to register the job
+      console.log(`Starting polling for job ${batchJobId} in 3 seconds...`)
+      let interval: NodeJS.Timeout | null = null
+      
+      const initialTimeout = setTimeout(() => {
+        pollJobStatus()
+        interval = setInterval(pollJobStatus, 2000)
+      }, 3000)
+      
+      return () => {
+        clearTimeout(initialTimeout)
+        if (interval) clearInterval(interval)
+      }
+    }
+  }, [batchJobId, mode, toast])
+
+  // Batch file handlers
+  const handleBatchFilesSelect = (files: FileList | File[]) => {
+    const fileArray = Array.from(files)
+    
+    // Validate file types
+    const invalidFiles = fileArray.filter(file => !file.name.toLowerCase().endsWith('.pdf'))
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "Invalid file type",
+        description: `Only PDF files are allowed. Found ${invalidFiles.length} non-PDF file(s).`,
+        variant: "destructive"
+      })
+      return
+    }
+    
+    // Check limits
+    if (batchConfig) {
+      if (fileArray.length > batchConfig.limits.max_files_per_batch) {
+        toast({
+          title: "Too many files",
+          description: `Maximum ${batchConfig.limits.max_files_per_batch} files allowed per batch`,
+          variant: "destructive"
+        })
+        return
+      }
+      
+      const totalSize = fileArray.reduce((sum, file) => sum + file.size, 0)
+      if (totalSize > batchConfig.limits.batch_upload_limit_bytes) {
+        toast({
+          title: "Total size too large",
+          description: `Total size (${(totalSize / 1024 / 1024).toFixed(1)}MB) exceeds limit of ${batchConfig.limits.batch_upload_limit_mb}MB`,
+          variant: "destructive"
+        })
+        return
+      }
+      
+      // Check individual file sizes
+      const oversizedFiles = fileArray.filter(file => file.size > batchConfig.limits.individual_file_limit_bytes)
+      if (oversizedFiles.length > 0) {
+        toast({
+          title: "Files too large",
+          description: `${oversizedFiles.length} file(s) exceed the ${batchConfig.limits.individual_file_limit_mb}MB individual file limit`,
+          variant: "destructive"
+        })
+        return
+      }
+    }
+    
+    setSelectedFiles(fileArray)
+  }
+
+  const handleBatchDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragActive(false)
+    
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      handleBatchFilesSelect(files)
+    }
+  }
+
+  const handleBatchFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      // Convert to array and combine with existing files
+      const newFiles = Array.from(files)
+      const combinedFiles = [...selectedFiles, ...newFiles]
+      
+      // Remove duplicates based on file name and size
+      const uniqueFiles = combinedFiles.filter((file, index, self) => 
+        index === self.findIndex(f => f.name === file.name && f.size === file.size)
+      )
+      
+      handleBatchFilesSelect(uniqueFiles)
+    }
+    
+    // Reset the input value to allow selecting the same files again if needed
+    e.target.value = ''
+  }
+
+  const handleBatchUpload = async () => {
+    if (selectedFiles.length === 0) {
+      toast({
+        title: "No files selected",
+        description: "Please select PDF files to upload",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    try {
+      setBatchLoading(true)
+      
+      toast({
+        title: "Starting upload",
+        description: `Uploading ${selectedFiles.length} files for batch processing...`,
+      })
+      
+      const response = await api.batchParseResumes(selectedFiles)
+      
+      if (response.success) {
+        console.log(`Created batch job: ${response.job_id}`)
+        
+        setBatchJobId(response.job_id)
+        setBatchJobStatus({
+          job_id: response.job_id,
+          batch_number: response.batch_number,
+          status: "processing",
+          total_files: response.total_files,
+          processed_files: 0,
+          successful_profiles: 0,
+          completed_profiles: 0,
+          incomplete_profiles: 0,
+          failed_files: 0,
+          ai_summaries_generated: 0,
+          ai_summaries_failed: 0,
+          classifications_generated: 0,
+          classifications_failed: 0,
+          progress_percentage: 0,
+          processing_time_seconds: 0,
+          errors: [],
+          results: [],
+          created_at: new Date().toISOString(),
+          started_at: new Date().toISOString(),
+          completed_at: "",
+          batch_upload_datetime: new Date().toISOString()
+        })
+        
+        toast({
+          title: "Batch upload started",
+          description: `Processing ${response.total_files} files. Job ID: ${response.job_id}`,
+        })
+        
+        // Clear selected files
+        setSelectedFiles([])
+        
+        // Reload the jobs list to include this new job
+        try {
+          const jobsResponse = await api.getBatchJobs()
+          setBatchJobs(jobsResponse.jobs)
+          
+          // Verify our job exists in the list
+          const foundJob = jobsResponse.jobs.find(job => job.job_id === response.job_id)
+          if (!foundJob) {
+            console.warn(`Job ${response.job_id} not immediately visible in jobs list`)
+          }
+        } catch (jobsError) {
+          console.error("Failed to reload jobs after upload:", jobsError)
+        }
+      } else {
+        throw new Error(response.message || "Batch upload failed")
+      }
+    } catch (error) {
+      console.error("Batch upload error:", error)
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to start batch processing",
+        variant: "destructive"
+      })
+      
+      // Clear job states on error
+      setBatchJobId(null)
+      setBatchJobStatus(null)
+    } finally {
+      setBatchLoading(false)
+    }
+  }
+
+  const removeBatchFile = (index: number) => {
+    setSelectedFiles(files => files.filter((_, i) => i !== index))
+  }
+
+  const cancelBatchJob = async (jobId: string) => {
+    try {
+      await api.cancelBatchJob(jobId)
+      toast({
+        title: "Job cancelled",
+        description: `Batch job ${jobId} has been cancelled`
+      })
+      
+      // Reload jobs
+      const response = await api.getBatchJobs()
+      setBatchJobs(response.jobs)
+      
+      // Clear current job if it's the one we cancelled
+      if (batchJobId === jobId) {
+        setBatchJobId(null)
+        setBatchJobStatus(null)
+      }
+    } catch (error) {
+      toast({
+        title: "Cancel failed",
+        description: "Failed to cancel batch job",
+        variant: "destructive"
+      })
+    }
   }
 
   // Load nested entities when parsed data is available
@@ -563,22 +963,80 @@ export default function CreateCandidatePage() {
     <div className="container mx-auto py-6 space-y-6">
       <PageHeader
         title="Create New Candidate"
-        description="Upload and parse a resume or manually create a candidate profile"
+        description={mode === "single" 
+          ? "Upload and parse a resume or manually create a candidate profile"
+          : "Upload multiple PDF resumes for batch processing and automatic profile creation"
+        }
       />
 
-      {/* Progress Bar */}
+      {/* Mode Toggle */}
       <Card>
         <CardContent className="py-4">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium">Progress</span>
-            <span className="text-sm text-gray-600">{getStepProgress()}%</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <User className="w-5 h-5 text-blue-600" />
+                <Label htmlFor="mode-toggle" className="font-medium">Single Profile</Label>
+              </div>
+              <Switch
+                id="mode-toggle"
+                checked={mode === "batch"}
+                onCheckedChange={(checked) => {
+                  setMode(checked ? "batch" : "single")
+                  // Reset states when switching modes
+                  if (checked) {
+                    setStep("upload")
+                    setSelectedFile(null)
+                    setParsedData(null)
+                    setFormData({})
+                  } else {
+                    setSelectedFiles([])
+                    setBatchJobId(null)
+                    setBatchJobStatus(null)
+                  }
+                }}
+              />
+              <div className="flex items-center space-x-2">
+                <Users className="w-5 h-5 text-green-600" />
+                <Label htmlFor="mode-toggle" className="font-medium">Batch Processing</Label>
+              </div>
+            </div>
+            
+            {mode === "batch" && batchConfig && (
+              <div className="text-sm text-gray-600">
+                Max: {batchConfig.limits.max_files_per_batch} files, {batchConfig.limits.batch_upload_limit_mb}MB total
+              </div>
+            )}
           </div>
-          <Progress value={getStepProgress()} />
+          
+          {mode === "batch" && (
+            <Alert className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Batch mode will automatically parse resumes, generate AI summaries, and create complete candidate profiles in the background. 
+                Individual file limit: {batchConfig?.limits.individual_file_limit_mb || 10}MB, 
+                Batch limit: {batchConfig?.limits.batch_upload_limit_mb || 100}MB total.
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
-      {/* Step 1: Upload */}
-      {step === "upload" && (
+      {/* Progress Bar - Only show for single mode */}
+      {mode === "single" && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium">Progress</span>
+              <span className="text-sm text-gray-600">{getStepProgress()}%</span>
+            </div>
+            <Progress value={getStepProgress()} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Single Mode Upload */}
+      {mode === "single" && step === "upload" && (
         <Card>
           <CardHeader>
             <CardTitle>Upload Resume</CardTitle>
@@ -648,8 +1106,275 @@ export default function CreateCandidatePage() {
         </Card>
       )}
 
-      {/* Step 2: Parsing */}
-      {step === "parsing" && (
+      {/* Batch Mode Upload */}
+      {mode === "batch" && (
+        <div className="space-y-6">
+          {/* File Upload Area */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Batch Upload PDF Resumes</CardTitle>
+              <CardDescription>
+                Upload multiple PDF resumes for automatic processing and profile creation
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                  dragActive 
+                    ? 'border-green-500 bg-green-50 border-solid' 
+                    : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleBatchDrop}
+                onClick={() => batchFileInputRef.current?.click()}
+              >
+                <Users className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-green-500' : 'text-gray-400'}`} />
+                <h3 className="text-lg font-medium mb-2">
+                  {dragActive ? 'Drop PDF files here' : 'Upload Multiple PDF Resumes'}
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  {dragActive ? 'Release to upload files' : 'Drag and drop or click to select multiple PDF files'}
+                </p>
+                {batchConfig && (
+                  <p className="text-sm text-gray-500 mb-4">
+                    Max {batchConfig.limits.max_files_per_batch} files • {batchConfig.limits.individual_file_limit_mb}MB per file • {batchConfig.limits.batch_upload_limit_mb}MB total
+                  </p>
+                )}
+                <Input
+                  type="file"
+                  accept=".pdf"
+                  multiple
+                  onChange={handleBatchFileInput}
+                  ref={batchFileInputRef}
+                  className="hidden"
+                />
+                <Button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    batchFileInputRef.current?.click()
+                  }} 
+                  className="max-w-xs mx-auto"
+                  variant={dragActive ? "default" : "outline"}
+                >
+                  Select Files
+                </Button>
+              </div>
+
+              {/* Selected Files List */}
+              {selectedFiles.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium">Selected Files ({selectedFiles.length})</h4>
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {selectedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <FileText className="w-5 h-5 text-blue-600" />
+                          <div>
+                            <span className="font-medium">{file.name}</span>
+                            <div className="text-sm text-gray-500">
+                              {(file.size / 1024 / 1024).toFixed(1)} MB
+                            </div>
+                          </div>
+                        </div>
+                        <Button 
+                          onClick={() => removeBatchFile(index)} 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="flex justify-between items-center pt-4 border-t">
+                    <div className="text-sm text-gray-600">
+                      Total: {(selectedFiles.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024).toFixed(1)} MB
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setSelectedFiles([])}
+                        disabled={batchLoading}
+                      >
+                        Clear All
+                      </Button>
+                      <Button 
+                        onClick={handleBatchUpload}
+                        disabled={selectedFiles.length === 0 || batchLoading}
+                      >
+                        {batchLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Starting...
+                          </>
+                        ) : (
+                          `Process ${selectedFiles.length} Files`
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Current Job Status */}
+          {batchJobStatus && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="w-5 h-5" />
+                  Current Job Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-medium">Job ID: {batchJobStatus.job_id}</div>
+                      <div className="text-sm text-gray-600">Batch: {batchJobStatus.batch_number}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={
+                        batchJobStatus.status === "completed" ? "default" :
+                        batchJobStatus.status === "failed" ? "destructive" :
+                        batchJobStatus.status === "processing" ? "secondary" : "outline"
+                      }>
+                        {batchJobStatus.status}
+                      </Badge>
+                      {batchJobStatus.status === "processing" && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => cancelBatchJob(batchJobStatus.job_id)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress</span>
+                      <span>{batchJobStatus.progress_percentage}%</span>
+                    </div>
+                    <Progress value={batchJobStatus.progress_percentage} />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <div className="font-medium">{batchJobStatus.processed_files}</div>
+                      <div className="text-gray-600">Processed</div>
+                    </div>
+                    <div>
+                      <div className="font-medium">{batchJobStatus.successful_profiles}</div>
+                      <div className="text-gray-600">Successful</div>
+                    </div>
+                    <div>
+                      <div className="font-medium">{batchJobStatus.completed_profiles}</div>
+                      <div className="text-gray-600">Complete</div>
+                    </div>
+                    <div>
+                      <div className="font-medium">{batchJobStatus.failed_files}</div>
+                      <div className="text-gray-600">Failed</div>
+                    </div>
+                  </div>
+                  
+                  {batchJobStatus.errors && batchJobStatus.errors.length > 0 && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <div className="font-medium mb-1">Errors encountered:</div>
+                        <ul className="list-disc list-inside text-sm">
+                          {batchJobStatus.errors.slice(0, 3).map((error: string, index: number) => (
+                            <li key={index}>{error}</li>
+                          ))}
+                          {batchJobStatus.errors.length > 3 && (
+                            <li>... and {batchJobStatus.errors.length - 3} more</li>
+                          )}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Active Batch Jobs */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Batch Jobs</CardTitle>
+              <CardDescription>
+                {batchJobs.length > 0 
+                  ? "Currently running batch resume processing jobs"
+                  : "No active batch jobs. Completed jobs are automatically removed from this list."
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {batchJobs.length > 0 ? (
+                <>
+                  <div className="space-y-3">
+                    {batchJobs.slice(0, 5).map((job) => (
+                      <div key={job.job_id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-medium">{job.batch_number}</div>
+                          <div className="text-sm text-gray-600">
+                            {job.total_files} files • {job.successful_profiles} successful • {job.failed_files} failed
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(job.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={
+                            job.status === "completed" ? "default" :
+                            job.status === "failed" ? "destructive" :
+                            job.status === "processing" ? "secondary" : "outline"
+                          }>
+                            {job.status}
+                          </Badge>
+                          {job.status === "processing" && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => cancelBatchJob(job.job_id)}
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {batchJobs.length > 5 && (
+                    <div className="text-center mt-4">
+                      <Button variant="outline" onClick={() => router.push("/candidates")}>
+                        View All Jobs
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No active batch jobs at the moment.</p>
+                  <p className="text-sm mt-1">Completed jobs are automatically removed from this list.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Single Mode Steps - Only show when in single mode */}
+      {mode === "single" && step === "parsing" && (
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
@@ -662,7 +1387,7 @@ export default function CreateCandidatePage() {
       )}
 
       {/* Step 3: Review and Edit */}
-      {step === "review" && parsedData && (
+      {mode === "single" && step === "review" && parsedData && (
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -1271,7 +1996,7 @@ export default function CreateCandidatePage() {
       )}
 
       {/* Step 4: Creating */}
-      {step === "creating" && (
+      {mode === "single" && step === "creating" && (
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
@@ -1284,7 +2009,7 @@ export default function CreateCandidatePage() {
       )}
 
       {/* Step 5: Finalizing */}
-      {step === "finalizing" && (
+      {mode === "single" && step === "finalizing" && (
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
@@ -1297,7 +2022,7 @@ export default function CreateCandidatePage() {
       )}
 
       {/* Step 6: Complete */}
-      {step === "complete" && (
+      {mode === "single" && step === "complete" && (
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
